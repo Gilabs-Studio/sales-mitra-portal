@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+:root {
+  --background: #faf9f5;
+  --foreground: #141413;
+  --card: #faf9f5;
+  --card-foreground: #141413;
+  --muted: #f0eee6;
+  --muted-foreground: #5e5d59;
+  --border: #b0aea5;
+  --input: #b0aea5;
+  --primary: #141413;
+  --primary-foreground: #faf9f5;
+  --secondary: #f0eee6;
+  --secondary-foreground: #141413;
+  --accent: #d97757;
+  --accent-foreground: #141413;
+  --destructive: #b5473f;
+  --success: #2f7d5f;
+  --warning: #b7791f;
+  --ring: #141413;
+  --radius: 0.5rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-ring: var(--ring);
+  --font-sans: "Anthropic Sans", Arial, Helvetica, sans-serif;
+  --font-serif: "Anthropic Serif", Georgia, serif;
+  --font-mono: "Anthropic Mono", "SFMono-Regular", Consolas, monospace;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 1rem;
+}
+
+* {
+  box-sizing: border-box;
+  border-color: var(--border);
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
+}
+
+body {
+  min-height: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+}
+
+button,
+a,
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--foreground);
+}

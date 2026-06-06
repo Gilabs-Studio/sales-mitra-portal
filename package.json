@@ -1,0 +1,16 @@
+{
+  "name": "mitra-sales-portal",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "build:web": "npm --workspace apps/web run build",
+    "lint:web": "npm --workspace apps/web run lint",
+    "dev:api": "cd apps/api && go run ./cmd/server",
+    "test:api": "cd apps/api && go test ./...",
+    "format:api": "cd apps/api && gofmt -w ./cmd ./internal"
+  }
+}

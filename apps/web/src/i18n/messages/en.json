@@ -1,0 +1,12 @@
+{
+  "brand": "GiLabs Partner Portal",
+  "nav": {
+    "home": "Home",
+    "partner": "Partner",
+    "admin": "Admin",
+    "leads": "Leads",
+    "knowledge": "Knowledge",
+    "login": "Login",
+    "register": "Register"
+  }
+}

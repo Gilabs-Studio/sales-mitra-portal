@@ -1,0 +1,12 @@
+{
+  "brand": "GiLabs Mitra Portal",
+  "nav": {
+    "home": "Beranda",
+    "partner": "Mitra",
+    "admin": "Admin",
+    "leads": "Lead",
+    "knowledge": "Knowledge",
+    "login": "Masuk",
+    "register": "Daftar"
+  }
+}
