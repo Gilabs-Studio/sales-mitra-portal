@@ -1,0 +1,269 @@
+{
+  "color": {
+    "Slate Dark": {
+      "$type": "color",
+      "$value": "#141413",
+      "$description": "Primary text, headings, nav links, borders, icon fills — dominant foreground color across all zones"
+    },
+    "Ivory Light": {
+      "$type": "color",
+      "$value": "#faf9f5",
+      "$description": "Primary page background, nav background, card surfaces, button text on dark fills"
+    },
+    "Ivory Medium": {
+      "$type": "color",
+      "$value": "#f0eee6",
+      "$description": "Secondary surface background, section dividers, nav bottom border"
+    },
+    "Cloud Medium": {
+      "$type": "color",
+      "$value": "#b0aea5",
+      "$description": "Muted borders, dividers, secondary text, link hover states, agate text"
+    },
+    "Cloud Dark": {
+      "$type": "color",
+      "$value": "#87867f",
+      "$description": "Tertiary/muted text labels, captions, metadata"
+    },
+    "Slate Light": {
+      "$type": "color",
+      "$value": "#5e5d59",
+      "$description": "Action-centric usage — link hover, secondary button states, interactive highlights"
+    },
+    "Clay / Accent": {
+      "$type": "color",
+      "$value": "#d97757",
+      "$description": "Brand accent color — used for highlights, decorative elements, and brand moments"
+    },
+    "Ivory Dark": {
+      "$type": "color",
+      "$value": "#e8e6dc",
+      "$description": "Subtle borders, hover states on secondary backgrounds"
+    }
+  },
+  "typography": {
+    "Display XL": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "\"Anthropic Sans\", Arial, sans-serif",
+        "fontSize": "57.73px",
+        "fontWeight": 700,
+        "lineHeight": "63.5px",
+        "letterSpacing": "normal"
+      },
+      "$description": "Hero headline — primary page-level display heading"
+    },
+    "Display Serif XL": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "\"Anthropic Serif\", Georgia, sans-serif",
+        "fontSize": "85.55px",
+        "fontWeight": 400,
+        "lineHeight": "94.11px",
+        "letterSpacing": "normal"
+      },
+      "$description": "Large editorial serif display — feature section headings"
+    },
+    "Heading L": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "\"Anthropic Sans\", Arial, sans-serif",
+        "fontSize": "24px",
+        "fontWeight": 600,
+        "lineHeight": "31.2px",
+        "letterSpacing": "normal"
+      },
+      "$description": "Section headings, card titles"
+    },
+    "Heading Serif M": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "\"Anthropic Serif\", Georgia, sans-serif",
+        "fontSize": "24px",
+        "fontWeight": 400,
+        "lineHeight": "33.6px",
+        "letterSpacing": "normal"
+      },
+      "$description": "Editorial section subheadings in serif"
+    },
+    "Body Serif M": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "\"Anthropic Serif\", Georgia, sans-serif",
+        "fontSize": "20px",
+        "fontWeight": 400,
+        "lineHeight": "28px",
+        "letterSpacing": "normal"
+      },
+      "$description": "Primary body copy — most-used text style across the page"
+    },
+    "Body Serif S": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "\"Anthropic Serif\", Georgia, sans-serif",
+        "fontSize": "16px",
+        "fontWeight": 400,
+        "lineHeight": "22.4px",
+        "letterSpacing": "normal"
+      },
+      "$description": "Secondary body copy, card descriptions"
+    },
+    "Body Serif Semibold S": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "\"Anthropic Serif\", Georgia, sans-serif",
+        "fontSize": "18px",
+        "fontWeight": 600,
+        "lineHeight": "25.2px",
+        "letterSpacing": "normal"
+      },
+      "$description": "Emphasized body text, pull quotes"
+    },
+    "UI Medium": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "\"Anthropic Sans\", Arial, sans-serif",
+        "fontSize": "16px",
+        "fontWeight": 500,
+        "lineHeight": "22.4px",
+        "letterSpacing": "normal"
+      },
+      "$description": "Nav links, button labels, UI controls"
+    },
+    "UI Regular": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "\"Anthropic Sans\", Arial, sans-serif",
+        "fontSize": "16px",
+        "fontWeight": 400,
+        "lineHeight": "22.4px",
+        "letterSpacing": "normal"
+      },
+      "$description": "Secondary UI text, dropdown items"
+    },
+    "Label S": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "\"Anthropic Sans\", Arial, sans-serif",
+        "fontSize": "12px",
+        "fontWeight": 400,
+        "lineHeight": "16.8px",
+        "letterSpacing": "-0.24px"
+      },
+      "$description": "Small labels, metadata, captions — most-used sans style"
+    },
+    "Label S Medium": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "\"Anthropic Sans\", Arial, sans-serif",
+        "fontSize": "12px",
+        "fontWeight": 500,
+        "lineHeight": "16.8px",
+        "letterSpacing": "normal"
+      },
+      "$description": "Emphasized small labels, tags"
+    },
+    "Detail M": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "\"Anthropic Sans\", Arial, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": 500,
+        "lineHeight": "18.2px",
+        "letterSpacing": "normal"
+      },
+      "$description": "Detail text, secondary nav items, footnotes"
+    },
+    "Code Regular": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "\"Anthropic Mono\"",
+        "fontSize": "16px",
+        "fontWeight": 400,
+        "lineHeight": "22.4px",
+        "letterSpacing": "normal"
+      },
+      "$description": "Inline code, technical references"
+    }
+  },
+  "spacing": {
+    "space-1": {
+      "$type": "dimension",
+      "$value": "0.25rem"
+    },
+    "space-2": {
+      "$type": "dimension",
+      "$value": "0.5rem"
+    },
+    "space-3": {
+      "$type": "dimension",
+      "$value": "0.75rem"
+    },
+    "space-4": {
+      "$type": "dimension",
+      "$value": "1rem"
+    },
+    "space-5": {
+      "$type": "dimension",
+      "$value": "1.5rem"
+    },
+    "space-6": {
+      "$type": "dimension",
+      "$value": "2rem"
+    },
+    "space-7": {
+      "$type": "dimension",
+      "$value": "2.5rem"
+    },
+    "space-8": {
+      "$type": "dimension",
+      "$value": "3rem"
+    },
+    "space-9": {
+      "$type": "dimension",
+      "$value": "4rem"
+    },
+    "space-11": {
+      "$type": "dimension",
+      "$value": "6rem"
+    },
+    "section-space-small": {
+      "$type": "dimension",
+      "$value": "4rem"
+    },
+    "section-space-main": {
+      "$type": "dimension",
+      "$value": "10rem"
+    },
+    "site-gutter": {
+      "$type": "dimension",
+      "$value": "2rem"
+    },
+    "site-margin": {
+      "$type": "dimension",
+      "$value": "64px"
+    }
+  },
+  "borderRadius": {
+    "radius-small": {
+      "$type": "dimension",
+      "$value": "0.25rem"
+    },
+    "radius-main": {
+      "$type": "dimension",
+      "$value": "0.5rem"
+    },
+    "radius-large": {
+      "$type": "dimension",
+      "$value": "1rem"
+    },
+    "radius-xl": {
+      "$type": "dimension",
+      "$value": "1.5rem"
+    },
+    "radius-round": {
+      "$type": "dimension",
+      "$value": "100vw"
+    }
+  }
+}

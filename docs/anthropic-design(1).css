@@ -1,0 +1,90 @@
+:root {
+  /* Colors */
+  --color-slate-dark: #141413;
+  --color-ivory-light: #faf9f5;
+  --color-ivory-medium: #f0eee6;
+  --color-cloud-medium: #b0aea5;
+  --color-cloud-dark: #87867f;
+  --color-slate-light: #5e5d59;
+  --color-clay-/-accent: #d97757;
+  --color-ivory-dark: #e8e6dc;
+
+  /* Typography */
+  --font-display-xl-family: "Anthropic Sans", Arial, sans-serif;
+  --font-display-xl-size: 57.73px;
+  --font-display-xl-weight: 700;
+  --font-display-xl-line-height: 63.5px;
+  --font-display-serif-xl-family: "Anthropic Serif", Georgia, sans-serif;
+  --font-display-serif-xl-size: 85.55px;
+  --font-display-serif-xl-weight: 400;
+  --font-display-serif-xl-line-height: 94.11px;
+  --font-heading-l-family: "Anthropic Sans", Arial, sans-serif;
+  --font-heading-l-size: 24px;
+  --font-heading-l-weight: 600;
+  --font-heading-l-line-height: 31.2px;
+  --font-heading-serif-m-family: "Anthropic Serif", Georgia, sans-serif;
+  --font-heading-serif-m-size: 24px;
+  --font-heading-serif-m-weight: 400;
+  --font-heading-serif-m-line-height: 33.6px;
+  --font-body-serif-m-family: "Anthropic Serif", Georgia, sans-serif;
+  --font-body-serif-m-size: 20px;
+  --font-body-serif-m-weight: 400;
+  --font-body-serif-m-line-height: 28px;
+  --font-body-serif-s-family: "Anthropic Serif", Georgia, sans-serif;
+  --font-body-serif-s-size: 16px;
+  --font-body-serif-s-weight: 400;
+  --font-body-serif-s-line-height: 22.4px;
+  --font-body-serif-semibold-s-family: "Anthropic Serif", Georgia, sans-serif;
+  --font-body-serif-semibold-s-size: 18px;
+  --font-body-serif-semibold-s-weight: 600;
+  --font-body-serif-semibold-s-line-height: 25.2px;
+  --font-ui-medium-family: "Anthropic Sans", Arial, sans-serif;
+  --font-ui-medium-size: 16px;
+  --font-ui-medium-weight: 500;
+  --font-ui-medium-line-height: 22.4px;
+  --font-ui-regular-family: "Anthropic Sans", Arial, sans-serif;
+  --font-ui-regular-size: 16px;
+  --font-ui-regular-weight: 400;
+  --font-ui-regular-line-height: 22.4px;
+  --font-label-s-family: "Anthropic Sans", Arial, sans-serif;
+  --font-label-s-size: 12px;
+  --font-label-s-weight: 400;
+  --font-label-s-line-height: 16.8px;
+  --font-label-s-letter-spacing: -0.24px;
+  --font-label-s-medium-family: "Anthropic Sans", Arial, sans-serif;
+  --font-label-s-medium-size: 12px;
+  --font-label-s-medium-weight: 500;
+  --font-label-s-medium-line-height: 16.8px;
+  --font-detail-m-family: "Anthropic Sans", Arial, sans-serif;
+  --font-detail-m-size: 14px;
+  --font-detail-m-weight: 500;
+  --font-detail-m-line-height: 18.2px;
+  --font-code-regular-family: "Anthropic Mono";
+  --font-code-regular-size: 16px;
+  --font-code-regular-weight: 400;
+  --font-code-regular-line-height: 22.4px;
+
+  /* Spacing */
+  --spacing-space-1: 0.25rem;
+  --spacing-space-2: 0.5rem;
+  --spacing-space-3: 0.75rem;
+  --spacing-space-4: 1rem;
+  --spacing-space-5: 1.5rem;
+  --spacing-space-6: 2rem;
+  --spacing-space-7: 2.5rem;
+  --spacing-space-8: 3rem;
+  --spacing-space-9: 4rem;
+  --spacing-space-11: 6rem;
+  --spacing-section-space-small: 4rem;
+  --spacing-section-space-main: 10rem;
+  --spacing-site-gutter: 2rem;
+  --spacing-site-margin: 64px;
+
+  /* Border Radius */
+  --radius-radius-small: 0.25rem;
+  --radius-radius-main: 0.5rem;
+  --radius-radius-large: 1rem;
+  --radius-radius-xl: 1.5rem;
+  --radius-radius-round: 100vw;
+
+}
