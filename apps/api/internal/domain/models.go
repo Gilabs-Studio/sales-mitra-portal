@@ -73,6 +73,8 @@ type Lead struct {
 	UnreadCount        int         `json:"unreadCount"`
 	MessageCount       int         `json:"messageCount"`
 	MeetingMessage     string      `json:"meetingMessage"`
+	CommissionRate     float64     `json:"commissionRate"`
+	DealAmount         int64       `json:"dealAmount"`
 	CreatedAt          time.Time   `json:"createdAt"`
 	UpdatedAt          time.Time   `json:"updatedAt"`
 }
@@ -157,4 +159,23 @@ type PartnerWithStats struct {
 	QualifiedLeads int64 `json:"qualifiedLeads"`
 	WonLeads       int64 `json:"wonLeads"`
 	RejectedLeads  int64 `json:"rejectedLeads"`
+}
+
+type LeadPayout struct {
+	ID             string    `json:"id"`
+	LeadID         string    `json:"leadId"`
+	AmountPaid     int64     `json:"amountPaid"`
+	CommissionPaid int64     `json:"commissionPaid"`
+	EvidenceURL    string    `json:"evidenceUrl"`
+	CreatedAt      time.Time `json:"createdAt"`
+}
+
+type PayoutSummary struct {
+	CommissionRate      float64 `json:"commissionRate"`
+	DealAmount          int64   `json:"dealAmount"`
+	TotalCommission     int64   `json:"totalCommission"`
+	ClientPaid          int64   `json:"clientPaid"`
+	PartnerPayout       int64   `json:"partnerPayout"`
+	PayoutProgress      float64 `json:"payoutProgress"`
+	RemainingCommission int64   `json:"remainingCommission"`
 }

@@ -21,6 +21,9 @@ import {
   listPartnerLeads,
   sendLeadMessage,
   updateLeadStatus,
+  getLeadPayouts,
+  createLeadPayout,
+  updateLeadCommission,
 } from "../services/leads.service";
 import type { LeadFilters, LeadStatus, LeadWithPartner } from "../types/lead.types";
 import { useLeadFilterStore } from "../stores/use-lead-filter-store";
@@ -166,3 +169,41 @@ export function useUpdateLeadStatus(lead: LeadWithPartner) {
 }
 
 export const statusOptions: Array<LeadStatus | ""> = ["", "submitted", "qualified", "contacted", "won", "lost", "rejected"];
+
+export function useLeadPayouts(leadId: string, role: "partner" | "admin") {
+  return useQuery({
+    queryKey: [role, "leads", leadId, "payouts"],
+    queryFn: () => getLeadPayouts(leadId, role),
+    enabled: !!leadId,
+  });
+}
+
+export function useCreatePayout(leadId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (values: { amountPaid: number; evidence: File }) =>
+      createLeadPayout(leadId, values.amountPaid, values.evidence),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "leads", leadId, "payouts"] });
+      void queryClient.invalidateQueries({ queryKey: ["partner", "leads", leadId, "payouts"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "leads", leadId] });
+      void queryClient.invalidateQueries({ queryKey: ["partner", "leads", leadId] });
+    },
+  });
+}
+
+export function useUpdateLeadCommission(leadId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (values: { dealAmount: number; commissionRate: number }) =>
+      updateLeadCommission(leadId, values),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "leads", leadId, "payouts"] });
+      void queryClient.invalidateQueries({ queryKey: ["partner", "leads", leadId, "payouts"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "leads", leadId] });
+      void queryClient.invalidateQueries({ queryKey: ["partner", "leads", leadId] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "leads"] });
+      void queryClient.invalidateQueries({ queryKey: ["partner", "leads"] });
+    },
+  });
+}

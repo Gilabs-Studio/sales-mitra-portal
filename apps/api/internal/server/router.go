@@ -24,6 +24,7 @@ type Handler struct {
 	leadService      *service.LeadService
 	knowledgeService *service.KnowledgeService
 	catalogService   *service.ServiceCatalogService
+	uploadService    *service.UploadService
 }
 
 func NewRouter(
@@ -40,7 +41,7 @@ func NewRouter(
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
 	router.Use(securityHeaders())
-	router.Use(limitRequestBody(1 << 20))
+	router.Use(limitRequestBody(10 << 20))
 
 	allowedOrigins := append([]string{}, cfg.WebOrigins...)
 	router.Use(cors.New(cors.Config{
@@ -61,6 +62,7 @@ func NewRouter(
 		leadService:      leadService,
 		knowledgeService: knowledgeService,
 		catalogService:   catalogService,
+		uploadService:    service.NewUploadService(cfg),
 	}
 
 	api := router.Group("/api/v1")
@@ -86,6 +88,7 @@ func NewRouter(
 	partner.POST("/leads/:id/messages", handler.sendPartnerMessage)
 	partner.GET("/leads/:id/ws", handler.wsLeadChat)
 	partner.GET("/referrals", handler.partnerReferrals)
+	partner.GET("/leads/:id/payouts", handler.getPayouts)
 
 	admin := protected.Group("/admin")
 	admin.Use(requireRole(domain.RoleAdmin))
@@ -102,6 +105,11 @@ func NewRouter(
 	admin.POST("/services", handler.upsertService)
 	admin.PATCH("/services/:type", handler.updateService)
 	admin.DELETE("/services/:type", handler.deleteService)
+	admin.PATCH("/leads/:id/commission", handler.updateLeadCommission)
+	admin.POST("/leads/:id/payouts", handler.createPayout)
+	admin.GET("/leads/:id/payouts", handler.getPayouts)
+
+	router.Static("/uploads", "./data/uploads")
 
 	return router
 }
@@ -570,4 +578,125 @@ func ceilDiv(a, b int) int {
 		return 1
 	}
 	return (a + b - 1) / b
+}
+
+func (h Handler) updateLeadCommission(c *gin.Context) {
+	leadID := c.Param("id")
+
+	var input struct {
+		DealAmount     int64   `json:"dealAmount"`
+		CommissionRate float64 `json:"commissionRate"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload bagi hasil tidak valid", err.Error()))
+		return
+	}
+
+	if input.DealAmount < 0 {
+		httpx.Fail(c, httpx.Validation("Nilai kontrak deal tidak boleh negatif", ""))
+		return
+	}
+
+	if input.CommissionRate < 0 || input.CommissionRate > 100 {
+		httpx.Fail(c, httpx.Validation("Persentase komisi harus di antara 0 dan 100", ""))
+		return
+	}
+
+	err := h.store.UpdateLeadCommission(c.Request.Context(), leadID, input.DealAmount, input.CommissionRate)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	summary, err := h.store.GetPayoutSummary(c.Request.Context(), leadID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	lead, err := h.store.GetLeadWithPartner(c.Request.Context(), leadID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Komisi bagi hasil diperbarui", gin.H{
+		"lead":    lead,
+		"summary": summary,
+	})
+}
+
+func (h Handler) createPayout(c *gin.Context) {
+	leadID := c.Param("id")
+
+	lead, err := h.store.GetLeadWithPartner(c.Request.Context(), leadID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	amountPaidStr := c.PostForm("amountPaid")
+	amountPaid, err := strconv.ParseInt(amountPaidStr, 10, 64)
+	if err != nil || amountPaid <= 0 {
+		httpx.Fail(c, httpx.Validation("Nominal bayar tidak valid", "amountPaid harus berupa angka positif"))
+		return
+	}
+
+	file, err := c.FormFile("evidence")
+	if err != nil {
+		httpx.Fail(c, httpx.Validation("Bukti bayar wajib diunggah", "evidence file is required"))
+		return
+	}
+
+	evidenceURL, err := h.uploadService.UploadEvidence(c.Request.Context(), file)
+	if err != nil {
+		httpx.Fail(c, httpx.Validation("Gagal mengunggah bukti bayar", err.Error()))
+		return
+	}
+
+	commissionPaid := int64(float64(amountPaid) * (lead.CommissionRate / 100.0))
+
+	payout, err := h.store.CreatePayout(c.Request.Context(), domain.LeadPayout{
+		LeadID:         leadID,
+		AmountPaid:     amountPaid,
+		CommissionPaid: commissionPaid,
+		EvidenceURL:    evidenceURL,
+	})
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	summary, err := h.store.GetPayoutSummary(c.Request.Context(), leadID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.Created(c, "Payout berhasil dicatat", gin.H{
+		"payout":  payout,
+		"summary": summary,
+	})
+}
+
+func (h Handler) getPayouts(c *gin.Context) {
+	leadID := c.Param("id")
+
+	payouts, err := h.store.ListPayouts(c.Request.Context(), leadID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	summary, err := h.store.GetPayoutSummary(c.Request.Context(), leadID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Daftar payout", gin.H{
+		"payouts": payouts,
+		"summary": summary,
+	})
 }

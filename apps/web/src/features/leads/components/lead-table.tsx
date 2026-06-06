@@ -1,5 +1,6 @@
 import { MessageCircle } from "lucide-react";
 import { Link } from "@/i18n/routing";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Lead, LeadWithPartner } from "../types/lead.types";
 import { serviceLabel } from "../utils/lead-labels";
 import { StatusBadge } from "./status-badge";
@@ -28,11 +29,12 @@ export function LeadTable<TLead extends Lead | LeadWithPartner>({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-card">
-      <table className="w-full min-w-[960px] border-collapse text-left text-sm">
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <ScrollArea orientation="horizontal">
+        <table className="w-full min-w-[960px] border-collapse text-left text-sm">
         <thead className="bg-secondary text-xs uppercase text-muted-foreground">
           <tr>
-            <th className="border-b border-border px-4 py-3">Perusahaan</th>
+            <th className="border-b border-border px-4 py-3 w-[280px]">Perusahaan</th>
             {showPartner ? <th className="border-b border-border px-4 py-3">Mitra</th> : null}
             <th className="border-b border-border px-4 py-3">Layanan</th>
             <th className="border-b border-border px-4 py-3">Budget</th>
@@ -53,17 +55,18 @@ export function LeadTable<TLead extends Lead | LeadWithPartner>({
                 key={lead.id}
                 className={cn("align-top transition-colors", hasUnread ? "bg-primary/5" : "")}
               >
-                <td className="border-b border-border px-4 py-3">
+                <td className="border-b border-border px-4 py-3 max-w-[280px]">
                   <Link
                     href={detailHref}
-                    className="cursor-pointer font-semibold text-foreground transition-colors hover:text-primary"
+                    className="block cursor-pointer truncate font-semibold text-foreground transition-colors hover:text-primary"
+                    title={lead.companyName}
                   >
                     {lead.companyName}
                   </Link>
-                  <div className="text-xs leading-5 text-muted-foreground">
+                  <div className="truncate text-xs leading-5 text-muted-foreground" title={`${lead.contactName} · ${lead.contactEmail}`}>
                     {lead.contactName} · {lead.contactEmail}
                   </div>
-                  <div className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
+                  <div className="mt-1 truncate text-xs leading-5 text-muted-foreground" title={lead.qualificationNote}>
                     {lead.qualificationNote}
                   </div>
                 </td>
@@ -124,6 +127,7 @@ export function LeadTable<TLead extends Lead | LeadWithPartner>({
           })}
         </tbody>
       </table>
+      </ScrollArea>
     </div>
   );
 }

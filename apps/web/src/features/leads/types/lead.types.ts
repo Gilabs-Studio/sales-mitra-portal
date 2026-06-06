@@ -19,6 +19,8 @@ export type Lead = {
   unreadCount: number;
   messageCount: number;
   meetingMessage?: string;
+  commissionRate: number;
+  dealAmount: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -85,4 +87,23 @@ export type PaginatedLeads<T> = PaginationMeta & {
 export type UpdateLeadStatusPayload = {
   status: LeadStatus;
   note: string;
+};
+
+export type LeadPayout = {
+  id: string;
+  leadId: string;
+  amountPaid: number;
+  commissionPaid: number;
+  evidenceUrl: string;
+  createdAt: string;
+};
+
+export type PayoutSummary = {
+  commissionRate: number;
+  dealAmount: number;
+  totalCommission: number;
+  clientPaid: number;
+  partnerPayout: number;
+  payoutProgress: number;
+  remainingCommission: number;
 };

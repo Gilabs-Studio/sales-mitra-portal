@@ -1,7 +1,7 @@
 "use client";
 
-import { BarChart3, BookOpen, LayoutDashboard, LogOut, Send, Settings2, Shield, MessageSquare } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import * as React from "react";
+import { LogOut } from "lucide-react";
 import { Link, usePathname } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 import { useLogout } from "@/features/auth/hooks/use-auth";
@@ -11,7 +11,6 @@ import { useUnreadCount } from "@/features/leads/hooks/use-leads";
 type NavItem = {
   href: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
 };
 
 type AppShellProps = {
@@ -21,17 +20,17 @@ type AppShellProps = {
 };
 
 const partnerNav: NavItem[] = [
-  { href: "/partner", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/partner/leads", label: "Lead", icon: Send },
-  { href: "/partner/chat", label: "Chat", icon: MessageSquare },
-  { href: "/partner/knowledge", label: "Knowledge", icon: BookOpen },
+  { href: "/partner", label: "Dashboard" },
+  { href: "/partner/leads", label: "Lead" },
+  { href: "/partner/chat", label: "Chat" },
+  { href: "/partner/knowledge", label: "Knowledge" },
 ];
 
 const adminNav: NavItem[] = [
-  { href: "/admin", label: "Dashboard", icon: Shield },
-  { href: "/admin/leads", label: "Lead", icon: BarChart3 },
-  { href: "/admin/chat", label: "Chat", icon: MessageSquare },
-  { href: "/admin/services", label: "Layanan", icon: Settings2 },
+  { href: "/admin", label: "Dashboard" },
+  { href: "/admin/leads", label: "Lead" },
+  { href: "/admin/chat", label: "Chat" },
+  { href: "/admin/services", label: "Layanan" },
 ];
 
 export function AppShell({ user, children, noPadding }: AppShellProps) {
@@ -40,52 +39,106 @@ export function AppShell({ user, children, noPadding }: AppShellProps) {
   const items = user.role === "admin" ? adminNav : partnerNav;
   const unreadQuery = useUnreadCount(user.role);
 
+  const [profileOpen, setProfileOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
   const totalUnread = unreadQuery.data?.data.reduce((acc, lead) => acc + lead.unreadCount, 0) ?? 0;
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   return (
     <main className={cn("flex min-h-screen flex-col bg-background", noPadding && "h-screen min-h-0 overflow-hidden")}>
-      <header className="border-b border-border bg-background shrink-0">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <Link href="/" className="text-lg font-extrabold text-foreground animate-pulse">
-              GiLabs Mitra Portal
-            </Link>
-            <p className="text-xs text-muted-foreground">
-              {user.name} · {user.role === "admin" ? "Admin" : user.partnerCode}
-            </p>
+      <header className="sticky top-0 z-50 shrink-0 bg-background py-4">
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between px-6">
+          {/* Logo / Branding */}
+          <Link href="/" className="font-extrabold tracking-tight text-foreground cursor-pointer text-base uppercase hover:opacity-90 transition-opacity">
+            GiLabs Portal
+          </Link>
+
+          {/* Navigation Menu & Profile */}
+          <div className="flex items-center gap-6">
+            <nav className="flex items-center gap-5">
+              {items.map((item) => {
+                const active = pathname === item.href || (item.href !== "/partner" && item.href !== "/admin" && pathname.startsWith(item.href));
+                const isChat = item.label === "Chat";
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "relative inline-flex items-center text-sm font-semibold transition-colors duration-200 cursor-pointer py-1",
+                      active
+                        ? "text-foreground font-extrabold"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {item.label}
+                    {isChat && totalUnread > 0 && (
+                      <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-white shadow-sm">
+                        {totalUnread > 99 ? "99+" : totalUnread}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            <div className="h-4 w-[1px] bg-border/40" />
+
+            {/* Profile Dropdown Trigger */}
+            <div className="relative flex items-center" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex items-center gap-2.5 cursor-pointer outline-none hover:opacity-95 transition-opacity"
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-extrabold text-foreground border border-border">
+                  {user.name.substring(0, 2).toUpperCase()}
+                </div>
+                <div className="hidden md:flex flex-col text-left">
+                  <span className="text-xs font-bold text-foreground leading-none">{user.name}</span>
+                  <span className="text-[10px] text-muted-foreground mt-1">
+                    {user.role === "admin" ? "Admin" : user.partnerCode}
+                  </span>
+                </div>
+              </button>
+
+              {/* Minimalist Profile Dropdown Box */}
+              {profileOpen && (
+                <div className="absolute right-0 top-11 z-50 w-56 rounded-lg border border-border bg-card p-1.5 shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="px-3 py-2">
+                    <div className="text-xs font-bold text-foreground leading-none">{user.name}</div>
+                    <div className="text-[10px] text-muted-foreground mt-1 truncate">{user.email}</div>
+                    <div className="mt-1.5 text-[9px] font-semibold text-primary uppercase tracking-wider">
+                      {user.role === "admin" ? "Console Admin" : `Mitra Code: ${user.partnerCode}`}
+                    </div>
+                  </div>
+                  <div className="my-1 border-t border-border/60" />
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-xs font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-md cursor-pointer transition-colors"
+                  >
+                    <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+                    Keluar
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-          <nav className="flex flex-wrap items-center gap-2">
-            {items.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href || (item.href !== "/partner" && item.href !== "/admin" && pathname.startsWith(item.href));
-              const isChat = item.label === "Chat";
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "relative inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer",
-                    active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-secondary text-foreground",
-                  )}
-                >
-                  <Icon className="h-4 w-4" aria-hidden="true" />
-                  {item.label}
-                  {isChat && totalUnread > 0 && (
-                    <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-white shadow-md">
-                      {totalUnread > 99 ? "99+" : totalUnread}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-            <Button type="button" variant="ghost" onClick={logout} className="cursor-pointer">
-              <LogOut className="h-4 w-4" aria-hidden="true" />
-              Keluar
-            </Button>
-          </nav>
         </div>
       </header>
-      <div className={cn("mx-auto w-full max-w-7xl px-5 py-8 flex-1 flex flex-col overflow-hidden", noPadding && "max-w-none px-0 py-0")}>
+      <div className={cn("mx-auto w-full max-w-[1400px] px-6 py-8 flex-1 flex flex-col overflow-hidden", noPadding && "max-w-none px-0 py-0")}>
         {children}
       </div>
     </main>

@@ -18,8 +18,9 @@ import {
 } from "@/features/leads/hooks/use-leads";
 import { serviceLabel, statusLabels } from "@/features/leads/utils/lead-labels";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
-import { useLeadWebSocket } from "@/features/leads/hooks/use-lead-ws";
 import { useQueryClient } from "@tanstack/react-query";
+import { PayoutPanel } from "../../leads/components/payout-panel";
+import { useLeadWebSocket } from "@/features/leads/hooks/use-lead-ws";
 
 const MONTH_MAP: Record<string, number> = {
   januari: 0, februari: 1, maret: 2, april: 3, mei: 4, juni: 5,
@@ -123,27 +124,6 @@ export function AdminLeadDetailScreen({ leadId }: AdminLeadDetailScreenProps) {
     return <div className="min-h-screen bg-background" />;
   }
 
-  if (leadId && lead.isLoading) {
-    return (
-      <AppShell user={auth.user}>
-        <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        </div>
-      </AppShell>
-    );
-  }
-
-  if (leadId && (lead.isError || !lead.data)) {
-    return (
-      <AppShell user={auth.user}>
-        <div className="rounded-lg border border-destructive bg-destructive/10 p-6 text-sm text-destructive">
-          Lead tidak ditemukan.
-        </div>
-      </AppShell>
-    );
-  }
-
-  const l = lead.data;
   const paginationMeta = leads.data;
 
   // Filter client-side by search query
@@ -285,157 +265,186 @@ export function AdminLeadDetailScreen({ leadId }: AdminLeadDetailScreenProps) {
           )}
         </div>
 
-        {leadId && l ? (
-          <>
-            {/* Center Column: Chat Panel */}
-            <div className="flex-1 flex flex-col h-full overflow-hidden bg-secondary/10 relative">
-              <LeadChat
-                leadId={leadId}
-                role="admin"
-                title={l.companyName}
-                subtitle={`${serviceLabel(l.serviceType)} · ${l.contactName}`}
-                limit={chatLimit}
-                onLoadMore={() => setChatLimit((prev) => prev + 15)}
-                hasMore={messages.data ? messages.data.length >= chatLimit : true}
-                headerActions={
-                  <div className="flex items-center gap-1.5">
-                    <Link
-                      href="/admin/leads"
-                      className="md:hidden flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => setRightPanelOpen(!rightPanelOpen)}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer"
-                      title="Detail Prospek"
-                    >
-                      <Info className="h-4 w-4" />
-                    </button>
-                  </div>
-                }
-                className="flex-1 h-full"
-              />
+        {leadId ? (
+          lead.isLoading ? (
+            <>
+              {/* Center Column Loading State */}
+              <div className="flex-1 flex flex-col items-center justify-center bg-secondary/10 relative h-full">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+              {/* Right Column Loading State */}
+              {rightPanelOpen && (
+                <div className="w-80 lg:w-96 border-l border-border bg-card flex flex-col h-full shrink-0 items-center justify-center">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              )}
+            </>
+          ) : lead.isError || !lead.data ? (
+            <div className="flex-1 flex flex-col items-center justify-center bg-secondary/5 text-destructive p-8 text-center">
+              <p className="text-sm font-semibold">Lead tidak ditemukan atau Anda tidak memiliki akses.</p>
             </div>
-
-            {/* Right Column: Lead Detail Sidebar */}
-            {rightPanelOpen && (
-              <div className="w-80 lg:w-96 border-l border-border bg-card flex flex-col h-full shrink-0 overflow-y-auto">
-                <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
-                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2">
-                    <Info className="h-4 w-4 text-primary" />
-                    Detail Prospek
-                  </h3>
-                  <button
-                    onClick={() => setRightPanelOpen(false)}
-                    className="text-muted-foreground hover:text-foreground cursor-pointer text-xs"
-                  >
-                    Tutup
-                  </button>
+          ) : (() => {
+            const l = lead.data;
+            return (
+              <>
+                {/* Center Column: Chat Panel */}
+                <div className="flex-1 flex flex-col h-full overflow-hidden bg-secondary/10 relative">
+                  <LeadChat
+                    leadId={leadId}
+                    role="admin"
+                    title={l.companyName}
+                    subtitle={`${serviceLabel(l.serviceType)} · ${l.contactName}`}
+                    limit={chatLimit}
+                    onLoadMore={() => setChatLimit((prev) => prev + 15)}
+                    hasMore={messages.data ? messages.data.length >= chatLimit : true}
+                    headerActions={
+                      <div className="flex items-center gap-1.5">
+                        <Link
+                          href="/admin/leads"
+                          className="md:hidden flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer"
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => setRightPanelOpen(!rightPanelOpen)}
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer"
+                          title="Detail Prospek"
+                        >
+                          <Info className="h-4 w-4" />
+                        </button>
+                      </div>
+                    }
+                    className="flex-1 h-full"
+                  />
                 </div>
 
-                <div className="p-4 space-y-6">
-                  {/* Lead Company & Basic Info */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <StatusBadge status={l.status} />
-                      <span className="flex items-center gap-1 text-xs font-semibold text-foreground">
-                        <Star className="h-3.5 w-3.5 text-warning" />
-                        Score: {l.qualificationScore}
-                      </span>
+                {/* Right Column: Lead Detail Sidebar */}
+                {rightPanelOpen && (
+                  <div className="w-80 lg:w-96 border-l border-border bg-card flex flex-col h-full shrink-0 overflow-y-auto">
+                    <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
+                      <h3 className="font-bold text-foreground text-sm flex items-center gap-2">
+                        <Info className="h-4 w-4 text-primary" />
+                        Detail Prospek
+                      </h3>
+                      <button
+                        onClick={() => setRightPanelOpen(false)}
+                        className="text-muted-foreground hover:text-foreground cursor-pointer text-xs"
+                      >
+                        Tutup
+                      </button>
                     </div>
-                    <h2 className="text-lg font-extrabold text-foreground leading-snug">{l.companyName}</h2>
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      <div>Mitra: <span className="font-semibold text-foreground">{l.partnerName} ({l.partnerCode})</span></div>
-                      <div>Budget: <span className="font-semibold text-foreground">{l.budget > 0 ? formatCurrency(l.budget) : "Discovery"}</span></div>
-                      <div>Layanan: <span className="font-semibold text-foreground">{serviceLabel(l.serviceType)}</span></div>
-                      <div>Dibuat: <span className="font-semibold text-foreground">{formatDate(l.createdAt)}</span></div>
-                    </div>
-                  </div>
 
-                  {/* Status form (Admin Update Status) */}
-                  <div className="space-y-3 pt-4 border-t border-border">
-                    <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Update Status</h4>
-                    <AdminLeadStatusForm lead={l} />
-                  </div>
+                    <div className="p-4 space-y-6">
+                      {/* Lead Company & Basic Info */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <StatusBadge status={l.status} />
+                          <span className="flex items-center gap-1 text-xs font-semibold text-foreground">
+                            <Star className="h-3.5 w-3.5 text-warning" />
+                            Score: {l.qualificationScore}
+                          </span>
+                        </div>
+                        <h2 className="text-lg font-extrabold text-foreground leading-snug">{l.companyName}</h2>
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <div>Mitra: <span className="font-semibold text-foreground">{l.partnerName} ({l.partnerCode})</span></div>
+                          <div>Budget: <span className="font-semibold text-foreground">{l.budget > 0 ? formatCurrency(l.budget) : "Discovery"}</span></div>
+                          <div>Layanan: <span className="font-semibold text-foreground">{serviceLabel(l.serviceType)}</span></div>
+                          <div>Dibuat: <span className="font-semibold text-foreground">{formatDate(l.createdAt)}</span></div>
+                        </div>
+                      </div>
 
-                  {/* Contact Details */}
-                  <div className="space-y-3 pt-4 border-t border-border">
-                    <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Kontak</h4>
-                    <div className="space-y-2 text-xs">
-                      <div className="flex items-center gap-2 text-foreground">
-                        <span className="font-semibold">{l.contactName}</span>
+                      {/* Status form (Admin Update Status) */}
+                      <div className="space-y-3 pt-4 border-t border-border">
+                        <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Update Status</h4>
+                        <AdminLeadStatusForm lead={l} />
                       </div>
-                      <div className="flex items-center gap-2 text-muted-foreground truncate" title={l.contactEmail}>
-                        <Mail className="h-3.5 w-3.5 shrink-0" />
-                        {l.contactEmail}
+
+                      {/* Contact Details */}
+                      <div className="space-y-3 pt-4 border-t border-border">
+                        <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Kontak</h4>
+                        <div className="space-y-2 text-xs">
+                          <div className="flex items-center gap-2 text-foreground">
+                            <span className="font-semibold">{l.contactName}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-muted-foreground truncate" title={l.contactEmail}>
+                            <Mail className="h-3.5 w-3.5 shrink-0" />
+                            {l.contactEmail}
+                          </div>
+                          {l.contactPhone && (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Phone className="h-3.5 w-3.5 shrink-0" />
+                              {l.contactPhone}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      {l.contactPhone && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="h-3.5 w-3.5 shrink-0" />
-                          {l.contactPhone}
+
+                      {/* Scheduled Meeting Info */}
+                      <div className="space-y-3 pt-4 border-t border-border">
+                        <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5 text-primary" />
+                          Jadwal Meeting
+                        </h4>
+                        {scheduledMeeting ? (
+                          <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed">
+                            <div className="font-semibold text-primary">Meeting terkonfirmasi:</div>
+                            <div className="mt-1 text-foreground font-medium">{scheduledMeeting}</div>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-muted-foreground italic">
+                            Belum ada jadwal meeting. Klik ikon kalender di chat untuk menjadwalkan.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Commission & Payout Panel */}
+                      {l.status === "won" && (
+                        <div className="space-y-3 pt-4 border-t border-border">
+                          <PayoutPanel leadId={l.id} role="admin" />
                         </div>
                       )}
+
+                      {/* Note & Qualification Note */}
+                      {l.qualificationNote && (
+                        <div className="space-y-2 pt-4 border-t border-border">
+                          <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Catatan Kualifikasi</h4>
+                          <p className="text-xs text-muted-foreground leading-relaxed bg-secondary/30 p-2.5 rounded-lg border border-border">
+                            {l.qualificationNote}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Timeline */}
+                      <div className="space-y-3 pt-4 border-t border-border">
+                        <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Timeline Status</h4>
+                        {events.isLoading ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        ) : events.data?.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">Belum ada aktivitas</p>
+                        ) : (
+                          <ol className="relative border-l border-border pl-3 ml-1.5 space-y-4">
+                            {events.data?.map((ev) => (
+                              <li key={ev.id} className="relative pl-3">
+                                <div className="absolute -left-[16px] top-1.5 h-2 w-2 rounded-full border border-border bg-card" />
+                                <div className="text-xs font-semibold text-foreground">
+                                  {statusLabels[ev.status] ?? ev.status}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground mt-0.5">
+                                  {formatDate(ev.createdAt)}
+                                </div>
+                                {ev.note && <p className="text-[10px] text-muted-foreground mt-1 bg-secondary/20 p-1 rounded-sm">{ev.note}</p>}
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </div>
                     </div>
                   </div>
-
-                  {/* Scheduled Meeting Info */}
-                  <div className="space-y-3 pt-4 border-t border-border">
-                    <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5 text-primary" />
-                      Jadwal Meeting
-                    </h4>
-                    {scheduledMeeting ? (
-                      <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed">
-                        <div className="font-semibold text-primary">Meeting terkonfirmasi:</div>
-                        <div className="mt-1 text-foreground font-medium">{scheduledMeeting}</div>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground italic">
-                        Belum ada jadwal meeting. Klik ikon kalender di chat untuk menjadwalkan.
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Note & Qualification Note */}
-                  {l.qualificationNote && (
-                    <div className="space-y-2 pt-4 border-t border-border">
-                      <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Catatan Kualifikasi</h4>
-                      <p className="text-xs text-muted-foreground leading-relaxed bg-secondary/30 p-2.5 rounded-lg border border-border">
-                        {l.qualificationNote}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Timeline */}
-                  <div className="space-y-3 pt-4 border-t border-border">
-                    <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Timeline Status</h4>
-                    {events.isLoading ? (
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    ) : events.data?.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">Belum ada aktivitas</p>
-                    ) : (
-                      <ol className="relative border-l border-border pl-3 ml-1.5 space-y-4">
-                        {events.data?.map((ev) => (
-                          <li key={ev.id} className="relative pl-3">
-                            <div className="absolute -left-[16px] top-1.5 h-2 w-2 rounded-full border border-border bg-card" />
-                            <div className="text-xs font-semibold text-foreground">
-                              {statusLabels[ev.status] ?? ev.status}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground mt-0.5">
-                              {formatDate(ev.createdAt)}
-                            </div>
-                            {ev.note && <p className="text-[10px] text-muted-foreground mt-1 bg-secondary/20 p-1 rounded-sm">{ev.note}</p>}
-                          </li>
-                        ))}
-                      </ol>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
+                )}
+              </>
+            );
+          })()
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center bg-secondary/5 text-muted-foreground p-8 text-center">
             <MessageSquare className="h-16 w-16 text-muted-foreground/30 mb-3" />

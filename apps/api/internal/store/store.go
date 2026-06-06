@@ -156,6 +156,14 @@ func (s *Store) Migrate() error {
 			content TEXT NOT NULL,
 			created_at TEXT NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS lead_payouts (
+			id TEXT PRIMARY KEY,
+			lead_id TEXT NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+			amount_paid INTEGER NOT NULL,
+			commission_paid INTEGER NOT NULL,
+			evidence_url TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL
+		)`,
 	}
 
 	indexes := []string{
@@ -167,6 +175,7 @@ func (s *Store) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_lead_messages_lead_created ON lead_messages(lead_id, created_at ASC)`,
 		`CREATE INDEX IF NOT EXISTS idx_lead_messages_unread ON lead_messages(lead_id, is_read)`,
 		`CREATE INDEX IF NOT EXISTS idx_referrals_partner ON referrals(partner_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_lead_payouts_lead ON lead_payouts(lead_id)`,
 	}
 
 	tx, err := s.db.Begin()
@@ -182,6 +191,14 @@ func (s *Store) Migrate() error {
 	}
 
 	if err := addColumnIfMissing(tx, "users", "username", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+
+	if err := addColumnIfMissing(tx, "leads", "commission_rate", "REAL NOT NULL DEFAULT 0.0"); err != nil {
+		return err
+	}
+
+	if err := addColumnIfMissing(tx, "leads", "deal_amount", "INTEGER NOT NULL DEFAULT 0"); err != nil {
 		return err
 	}
 
@@ -574,6 +591,7 @@ func (s *Store) ListPartnerLeads(ctx context.Context, partnerID string, filters 
 	query := `SELECT l.id, l.partner_id, l.company_name, l.contact_name, l.contact_email, l.contact_phone,
 			l.service_type, l.budget, l.need_summary, l.notes, l.status, l.qualification_score,
 			l.qualification_note, l.created_at, l.updated_at,
+			l.commission_rate, l.deal_amount,
 			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id AND m.is_read = 0 AND m.sender_role = 'admin'), 0) AS unread_count,
 			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id), 0) AS message_count,
 			COALESCE((SELECT message FROM lead_messages m WHERE m.lead_id = l.id AND m.message LIKE '📅 Jadwal meeting diatur:%' ORDER BY m.created_at DESC LIMIT 1), '') AS meeting_message
@@ -625,6 +643,7 @@ func (s *Store) ListAdminLeads(ctx context.Context, filters LeadFilters) ([]doma
 	query := `SELECT l.id, l.partner_id, l.company_name, l.contact_name, l.contact_email, l.contact_phone,
 			l.service_type, l.budget, l.need_summary, l.notes, l.status, l.qualification_score,
 			l.qualification_note, l.created_at, l.updated_at, u.name, u.email, u.partner_code,
+			l.commission_rate, l.deal_amount,
 			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id AND m.is_read = 0 AND m.sender_role = 'partner'), 0) AS unread_count,
 			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id), 0) AS message_count,
 			COALESCE((SELECT message FROM lead_messages m WHERE m.lead_id = l.id AND m.message LIKE '📅 Jadwal meeting diatur:%' ORDER BY m.created_at DESC LIMIT 1), '') AS meeting_message
@@ -712,6 +731,7 @@ func (s *Store) GetLeadByID(ctx context.Context, leadID string, partnerID string
 		`SELECT l.id, l.partner_id, l.company_name, l.contact_name, l.contact_email, l.contact_phone,
 			l.service_type, l.budget, l.need_summary, l.notes, l.status, l.qualification_score,
 			l.qualification_note, l.created_at, l.updated_at,
+			l.commission_rate, l.deal_amount,
 			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id AND m.is_read = 0 AND m.sender_role = 'admin'), 0),
 			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id), 0),
 			COALESCE((SELECT message FROM lead_messages m WHERE m.lead_id = l.id AND m.message LIKE '📅 Jadwal meeting diatur:%' ORDER BY m.created_at DESC LIMIT 1), '') AS meeting_message
@@ -729,6 +749,7 @@ func (s *Store) GetLeadWithPartner(ctx context.Context, leadID string) (domain.L
 		`SELECT l.id, l.partner_id, l.company_name, l.contact_name, l.contact_email, l.contact_phone,
 			l.service_type, l.budget, l.need_summary, l.notes, l.status, l.qualification_score,
 			l.qualification_note, l.created_at, l.updated_at, u.name, u.email, u.partner_code,
+			l.commission_rate, l.deal_amount,
 			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id AND m.is_read = 0 AND m.sender_role = 'partner'), 0),
 			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id), 0),
 			COALESCE((SELECT message FROM lead_messages m WHERE m.lead_id = l.id AND m.message LIKE '📅 Jadwal meeting diatur:%' ORDER BY m.created_at DESC LIMIT 1), '') AS meeting_message
@@ -1148,6 +1169,7 @@ func scanLeadWithCount(row userAuthScanner) (domain.Lead, error) {
 		&lead.NeedSummary, &lead.Notes, &lead.Status,
 		&lead.QualificationScore, &lead.QualificationNote,
 		&createdAt, &updatedAt,
+		&lead.CommissionRate, &lead.DealAmount,
 		&lead.UnreadCount, &lead.MessageCount, &lead.MeetingMessage,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -1194,6 +1216,7 @@ func scanLeadWithPartnerRowWithCount(row userAuthScanner) (domain.LeadWithPartne
 		&item.QualificationScore, &item.QualificationNote,
 		&createdAt, &updatedAt,
 		&item.PartnerName, &item.PartnerEmail, &item.PartnerCode,
+		&item.CommissionRate, &item.DealAmount,
 		&item.UnreadCount, &item.MessageCount, &item.MeetingMessage,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -1334,7 +1357,7 @@ func intToBool(value int) bool {
 }
 
 func (s *Store) Cleanup(ctx context.Context) error {
-	tables := []string{"lead_messages", "lead_events", "leads", "referrals", "users", "service_catalog", "knowledge_articles"}
+	tables := []string{"lead_payouts", "lead_messages", "lead_events", "leads", "referrals", "users", "service_catalog", "knowledge_articles"}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -1356,4 +1379,125 @@ func (s *Store) Cleanup(ctx context.Context) error {
 	}
 
 	return tx.Commit()
+}
+
+func (s *Store) CreatePayout(ctx context.Context, payout domain.LeadPayout) (domain.LeadPayout, error) {
+	if payout.ID == "" {
+		payout.ID = uuid.NewString()
+	}
+	if payout.CreatedAt.IsZero() {
+		payout.CreatedAt = time.Now().UTC()
+	}
+
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO lead_payouts (id, lead_id, amount_paid, commission_paid, evidence_url, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		payout.ID,
+		payout.LeadID,
+		payout.AmountPaid,
+		payout.CommissionPaid,
+		payout.EvidenceURL,
+		formatTime(payout.CreatedAt),
+	)
+	if err != nil {
+		return domain.LeadPayout{}, err
+	}
+	return payout, nil
+}
+
+func (s *Store) ListPayouts(ctx context.Context, leadID string) ([]domain.LeadPayout, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT id, lead_id, amount_paid, commission_paid, evidence_url, created_at
+		 FROM lead_payouts
+		 WHERE lead_id = ?
+		 ORDER BY created_at DESC`,
+		leadID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var payouts []domain.LeadPayout
+	for rows.Next() {
+		var p domain.LeadPayout
+		var createdAt string
+		if err := rows.Scan(&p.ID, &p.LeadID, &p.AmountPaid, &p.CommissionPaid, &p.EvidenceURL, &createdAt); err != nil {
+			return nil, err
+		}
+		p.CreatedAt = parseTime(createdAt)
+		payouts = append(payouts, p)
+	}
+	return payouts, rows.Err()
+}
+
+func (s *Store) GetPayoutSummary(ctx context.Context, leadID string) (domain.PayoutSummary, error) {
+	var dealAmount int64
+	var commissionRate float64
+	err := s.db.QueryRowContext(
+		ctx,
+		`SELECT deal_amount, commission_rate FROM leads WHERE id = ?`,
+		leadID,
+	).Scan(&dealAmount, &commissionRate)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.PayoutSummary{}, ErrNotFound
+		}
+		return domain.PayoutSummary{}, err
+	}
+
+	var clientPaid sql.NullInt64
+	var partnerPayout sql.NullInt64
+	err = s.db.QueryRowContext(
+		ctx,
+		`SELECT SUM(amount_paid), SUM(commission_paid) FROM lead_payouts WHERE lead_id = ?`,
+		leadID,
+	).Scan(&clientPaid, &partnerPayout)
+	if err != nil {
+		return domain.PayoutSummary{}, err
+	}
+
+	totalCommission := int64(float64(dealAmount) * (commissionRate / 100.0))
+	cPaid := clientPaid.Int64
+	pPayout := partnerPayout.Int64
+	remainingCommission := totalCommission - pPayout
+
+	var progress float64
+	if totalCommission > 0 {
+		progress = (float64(pPayout) / float64(totalCommission)) * 100.0
+	}
+
+	return domain.PayoutSummary{
+		CommissionRate:      commissionRate,
+		DealAmount:          dealAmount,
+		TotalCommission:     totalCommission,
+		ClientPaid:          cPaid,
+		PartnerPayout:       pPayout,
+		PayoutProgress:      progress,
+		RemainingCommission: remainingCommission,
+	}, nil
+}
+
+func (s *Store) UpdateLeadCommission(ctx context.Context, leadID string, dealAmount int64, commissionRate float64) error {
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE leads SET deal_amount = ?, commission_rate = ?, updated_at = ? WHERE id = ?`,
+		dealAmount,
+		commissionRate,
+		formatTime(time.Now().UTC()),
+		leadID,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
