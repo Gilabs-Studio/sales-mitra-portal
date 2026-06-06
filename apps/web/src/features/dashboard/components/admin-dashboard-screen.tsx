@@ -81,7 +81,7 @@ export function AdminDashboardScreen() {
         <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
           <section>
             <h2 className="mb-3 text-lg font-extrabold text-foreground">Lead terbaru</h2>
-            <LeadTable leads={dashboard.data?.recentLeads ?? []} showPartner />
+            <LeadTable leads={dashboard.data?.recentLeads ?? []} showPartner role="admin" />
           </section>
           <PartnerStatsPanel />
         </div>

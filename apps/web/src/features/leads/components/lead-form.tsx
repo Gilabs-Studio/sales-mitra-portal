@@ -1,9 +1,11 @@
 "use client";
 
 import { Send } from "lucide-react";
+import { Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useServiceCatalog } from "@/features/services/hooks/use-services";
@@ -16,6 +18,7 @@ export function LeadForm() {
   const {
     register,
     watch,
+    control,
     formState: { errors },
   } = form;
   const selectedService = services.data?.find((service) => service.type === watch("serviceType"));
@@ -69,7 +72,20 @@ export function LeadForm() {
         </div>
         <Field>
           <FieldLabel htmlFor="budget">Budget</FieldLabel>
-          <Input id="budget" type="number" min={0} {...register("budget")} />
+          <Controller
+            name="budget"
+            control={control}
+            render={({ field }) => (
+              <NumericInput
+                id="budget"
+                min={0}
+                placeholder="0"
+                value={field.value as number}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+              />
+            )}
+          />
           {errors.budget ? <FieldError>{errors.budget.message}</FieldError> : null}
         </Field>
         <Field>

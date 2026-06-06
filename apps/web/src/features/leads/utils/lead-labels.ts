@@ -1,7 +1,7 @@
 import type { LeadStatus, ServiceType } from "../types/lead.types";
 
 export const statusLabels: Record<LeadStatus, string> = {
-  submitted: "Submitted",
+  submitted: "Menunggu Review",
   qualified: "Qualified",
   contacted: "Contacted",
   won: "Won",

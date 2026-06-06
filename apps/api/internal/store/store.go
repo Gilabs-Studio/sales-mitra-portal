@@ -40,6 +40,7 @@ type LeadFilters struct {
 	Status      string
 	ServiceType string
 	Limit       int
+	Offset      int
 }
 
 type ServiceRuleInput struct {
@@ -138,6 +139,16 @@ func (s *Store) Migrate() error {
 			usage_count INTEGER NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS lead_messages (
+			id TEXT PRIMARY KEY,
+			lead_id TEXT NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+			sender_id TEXT NOT NULL,
+			sender_name TEXT NOT NULL DEFAULT '',
+			sender_role TEXT NOT NULL DEFAULT '',
+			message TEXT NOT NULL,
+			is_read INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT NOT NULL
+		)`,
 		`CREATE TABLE IF NOT EXISTS knowledge_articles (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
@@ -153,6 +164,8 @@ func (s *Store) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_leads_partner_status_created ON leads(partner_id, status, created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_leads_status_service_created ON leads(status, service_type, created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_lead_events_lead_created ON lead_events(lead_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_lead_messages_lead_created ON lead_messages(lead_id, created_at ASC)`,
+		`CREATE INDEX IF NOT EXISTS idx_lead_messages_unread ON lead_messages(lead_id, is_read)`,
 		`CREATE INDEX IF NOT EXISTS idx_referrals_partner ON referrals(partner_id)`,
 	}
 
@@ -539,41 +552,82 @@ func (s *Store) CreateLead(ctx context.Context, input CreateLeadInput) (domain.L
 	return lead, nil
 }
 
-func (s *Store) ListPartnerLeads(ctx context.Context, partnerID string, filters LeadFilters) ([]domain.Lead, error) {
+func (s *Store) ListPartnerLeads(ctx context.Context, partnerID string, filters LeadFilters) ([]domain.Lead, int, error) {
 	limit := normalizeLimit(filters.Limit)
-	query := `SELECT id, partner_id, company_name, contact_name, contact_email, contact_phone,
-			service_type, budget, need_summary, notes, status, qualification_score,
-			qualification_note, created_at, updated_at
-		FROM leads
-		WHERE partner_id = ?`
+	offset := filters.Offset
+
+	countQuery := `SELECT COUNT(*) FROM leads WHERE partner_id = ?`
+	countArgs := []interface{}{partnerID}
+	if filters.Status != "" {
+		countQuery += " AND status = ?"
+		countArgs = append(countArgs, filters.Status)
+	}
+	if filters.ServiceType != "" {
+		countQuery += " AND service_type = ?"
+		countArgs = append(countArgs, filters.ServiceType)
+	}
+	var total int
+	if err := s.db.QueryRowContext(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	query := `SELECT l.id, l.partner_id, l.company_name, l.contact_name, l.contact_email, l.contact_phone,
+			l.service_type, l.budget, l.need_summary, l.notes, l.status, l.qualification_score,
+			l.qualification_note, l.created_at, l.updated_at,
+			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id AND m.is_read = 0 AND m.sender_role = 'admin'), 0) AS unread_count,
+			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id), 0) AS message_count,
+			COALESCE((SELECT message FROM lead_messages m WHERE m.lead_id = l.id AND m.message LIKE '📅 Jadwal meeting diatur:%' ORDER BY m.created_at DESC LIMIT 1), '') AS meeting_message
+		FROM leads l
+		WHERE l.partner_id = ?`
 	args := []interface{}{partnerID}
 
 	if filters.Status != "" {
-		query += " AND status = ?"
+		query += " AND l.status = ?"
 		args = append(args, filters.Status)
 	}
 	if filters.ServiceType != "" {
-		query += " AND service_type = ?"
+		query += " AND l.service_type = ?"
 		args = append(args, filters.ServiceType)
 	}
 
-	query += " ORDER BY created_at DESC LIMIT ?"
-	args = append(args, limit)
+	query += " ORDER BY COALESCE((SELECT MAX(created_at) FROM lead_messages m WHERE m.lead_id = l.id), l.created_at) DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
-	return scanLeads(rows)
+	leads, err := scanLeadsWithCount(rows)
+	return leads, total, err
 }
 
-func (s *Store) ListAdminLeads(ctx context.Context, filters LeadFilters) ([]domain.LeadWithPartner, error) {
+func (s *Store) ListAdminLeads(ctx context.Context, filters LeadFilters) ([]domain.LeadWithPartner, int, error) {
 	limit := normalizeLimit(filters.Limit)
+	offset := filters.Offset
+
+	countQuery := `SELECT COUNT(*) FROM leads l WHERE 1 = 1`
+	countArgs := []interface{}{}
+	if filters.Status != "" {
+		countQuery += " AND l.status = ?"
+		countArgs = append(countArgs, filters.Status)
+	}
+	if filters.ServiceType != "" {
+		countQuery += " AND l.service_type = ?"
+		countArgs = append(countArgs, filters.ServiceType)
+	}
+	var total int
+	if err := s.db.QueryRowContext(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
 	query := `SELECT l.id, l.partner_id, l.company_name, l.contact_name, l.contact_email, l.contact_phone,
 			l.service_type, l.budget, l.need_summary, l.notes, l.status, l.qualification_score,
-			l.qualification_note, l.created_at, l.updated_at, u.name, u.email, u.partner_code
+			l.qualification_note, l.created_at, l.updated_at, u.name, u.email, u.partner_code,
+			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id AND m.is_read = 0 AND m.sender_role = 'partner'), 0) AS unread_count,
+			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id), 0) AS message_count,
+			COALESCE((SELECT message FROM lead_messages m WHERE m.lead_id = l.id AND m.message LIKE '📅 Jadwal meeting diatur:%' ORDER BY m.created_at DESC LIMIT 1), '') AS meeting_message
 		FROM leads l
 		INNER JOIN users u ON u.id = l.partner_id
 		WHERE 1 = 1`
@@ -588,16 +642,17 @@ func (s *Store) ListAdminLeads(ctx context.Context, filters LeadFilters) ([]doma
 		args = append(args, filters.ServiceType)
 	}
 
-	query += " ORDER BY l.created_at DESC LIMIT ?"
-	args = append(args, limit)
+	query += " ORDER BY COALESCE((SELECT MAX(created_at) FROM lead_messages m WHERE m.lead_id = l.id), l.created_at) DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
-	return scanLeadWithPartners(rows)
+	leads, err := scanLeadWithPartnersWithCount(rows)
+	return leads, total, err
 }
 
 func (s *Store) UpdateLeadStatus(ctx context.Context, leadID string, actorID string, status domain.LeadStatus, note string) (domain.LeadWithPartner, error) {
@@ -651,18 +706,38 @@ func (s *Store) UpdateLeadStatus(ctx context.Context, leadID string, actorID str
 	return s.GetLeadWithPartner(ctx, leadID)
 }
 
+func (s *Store) GetLeadByID(ctx context.Context, leadID string, partnerID string) (domain.Lead, error) {
+	row := s.db.QueryRowContext(
+		ctx,
+		`SELECT l.id, l.partner_id, l.company_name, l.contact_name, l.contact_email, l.contact_phone,
+			l.service_type, l.budget, l.need_summary, l.notes, l.status, l.qualification_score,
+			l.qualification_note, l.created_at, l.updated_at,
+			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id AND m.is_read = 0 AND m.sender_role = 'admin'), 0),
+			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id), 0),
+			COALESCE((SELECT message FROM lead_messages m WHERE m.lead_id = l.id AND m.message LIKE '📅 Jadwal meeting diatur:%' ORDER BY m.created_at DESC LIMIT 1), '') AS meeting_message
+		 FROM leads l
+		 WHERE l.id = ? AND l.partner_id = ?`,
+		leadID,
+		partnerID,
+	)
+	return scanLeadWithCount(row)
+}
+
 func (s *Store) GetLeadWithPartner(ctx context.Context, leadID string) (domain.LeadWithPartner, error) {
 	row := s.db.QueryRowContext(
 		ctx,
 		`SELECT l.id, l.partner_id, l.company_name, l.contact_name, l.contact_email, l.contact_phone,
 			l.service_type, l.budget, l.need_summary, l.notes, l.status, l.qualification_score,
-			l.qualification_note, l.created_at, l.updated_at, u.name, u.email, u.partner_code
+			l.qualification_note, l.created_at, l.updated_at, u.name, u.email, u.partner_code,
+			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id AND m.is_read = 0 AND m.sender_role = 'partner'), 0),
+			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id), 0),
+			COALESCE((SELECT message FROM lead_messages m WHERE m.lead_id = l.id AND m.message LIKE '📅 Jadwal meeting diatur:%' ORDER BY m.created_at DESC LIMIT 1), '') AS meeting_message
 		FROM leads l
 		INNER JOIN users u ON u.id = l.partner_id
 		WHERE l.id = ?`,
 		leadID,
 	)
-	return scanLeadWithPartnerRow(row)
+	return scanLeadWithPartnerRowWithCount(row)
 }
 
 func (s *Store) GetPartnerDashboard(ctx context.Context, partnerID string) (domain.PartnerDashboard, error) {
@@ -674,7 +749,7 @@ func (s *Store) GetPartnerDashboard(ctx context.Context, partnerID string) (doma
 	if err != nil {
 		return domain.PartnerDashboard{}, err
 	}
-	recentLeads, err := s.ListPartnerLeads(ctx, partnerID, LeadFilters{Limit: 6})
+	recentLeads, _, err := s.ListPartnerLeads(ctx, partnerID, LeadFilters{Limit: 6})
 	if err != nil {
 		return domain.PartnerDashboard{}, err
 	}
@@ -722,7 +797,7 @@ func (s *Store) GetAdminDashboard(ctx context.Context) (domain.AdminDashboard, e
 	if err != nil {
 		return domain.AdminDashboard{}, err
 	}
-	recentLeads, err := s.ListAdminLeads(ctx, LeadFilters{Limit: 8})
+	recentLeads, _, err := s.ListAdminLeads(ctx, LeadFilters{Limit: 8})
 	if err != nil {
 		return domain.AdminDashboard{}, err
 	}
@@ -796,6 +871,97 @@ func (s *Store) ListPartnersWithStats(ctx context.Context) ([]domain.PartnerWith
 		partners = append(partners, partner)
 	}
 	return partners, rows.Err()
+}
+
+func (s *Store) ListLeadEvents(ctx context.Context, leadID string) ([]domain.LeadEvent, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT e.id, e.lead_id, e.actor_id, COALESCE(u.name, e.actor_id), e.status, e.note, e.created_at
+		 FROM lead_events e
+		 LEFT JOIN users u ON u.id = e.actor_id
+		 WHERE e.lead_id = ?
+		 ORDER BY e.created_at ASC`,
+		leadID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	events := []domain.LeadEvent{}
+	for rows.Next() {
+		var ev domain.LeadEvent
+		var createdAt string
+		if err := rows.Scan(&ev.ID, &ev.LeadID, &ev.ActorID, &ev.ActorName, &ev.Status, &ev.Note, &createdAt); err != nil {
+			return nil, err
+		}
+		ev.CreatedAt = parseTime(createdAt)
+		events = append(events, ev)
+	}
+	return events, rows.Err()
+}
+
+func (s *Store) ListMessages(ctx context.Context, leadID string, limit, offset int) ([]domain.LeadMessage, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT id, lead_id, sender_id, sender_name, sender_role, message, is_read, created_at
+		 FROM lead_messages
+		 WHERE lead_id = ?
+		 ORDER BY created_at DESC
+		 LIMIT ? OFFSET ?`,
+		leadID, limit, offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	msgs := []domain.LeadMessage{}
+	for rows.Next() {
+		var msg domain.LeadMessage
+		var isRead int
+		var createdAt string
+		if err := rows.Scan(&msg.ID, &msg.LeadID, &msg.SenderID, &msg.SenderName, &msg.SenderRole, &msg.Message, &isRead, &createdAt); err != nil {
+			return nil, err
+		}
+		msg.IsRead = intToBool(isRead)
+		msg.CreatedAt = parseTime(createdAt)
+		msgs = append(msgs, msg)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Reverse slice to restore chronological order (ASC)
+	for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
+		msgs[i], msgs[j] = msgs[j], msgs[i]
+	}
+
+	return msgs, nil
+}
+
+func (s *Store) SendMessage(ctx context.Context, msg domain.LeadMessage) (domain.LeadMessage, error) {
+	now := time.Now().UTC()
+	msg.ID = uuid.NewString()
+	msg.CreatedAt = now
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO lead_messages (id, lead_id, sender_id, sender_name, sender_role, message, is_read, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+		msg.ID, msg.LeadID, msg.SenderID, msg.SenderName, msg.SenderRole, msg.Message, formatTime(now),
+	)
+	return msg, err
+}
+
+func (s *Store) MarkMessagesRead(ctx context.Context, leadID string, readerRole string) error {
+	// Mark messages NOT sent by readerRole as read (i.e., admin reading partner messages or vice versa)
+	_, err := s.db.ExecContext(
+		ctx,
+		`UPDATE lead_messages SET is_read = 1 WHERE lead_id = ? AND sender_role != ?`,
+		leadID,
+		readerRole,
+	)
+	return err
 }
 
 func (s *Store) ListReferrals(ctx context.Context, partnerID string) ([]domain.Referral, error) {
@@ -972,6 +1138,74 @@ func scanLead(rows userAuthScanner) (domain.Lead, error) {
 	return lead, nil
 }
 
+// scanLeadWithCount scans a lead row that includes unread_count and message_count columns.
+func scanLeadWithCount(row userAuthScanner) (domain.Lead, error) {
+	var lead domain.Lead
+	var createdAt, updatedAt string
+	if err := row.Scan(
+		&lead.ID, &lead.PartnerID, &lead.CompanyName, &lead.ContactName,
+		&lead.ContactEmail, &lead.ContactPhone, &lead.ServiceType, &lead.Budget,
+		&lead.NeedSummary, &lead.Notes, &lead.Status,
+		&lead.QualificationScore, &lead.QualificationNote,
+		&createdAt, &updatedAt,
+		&lead.UnreadCount, &lead.MessageCount, &lead.MeetingMessage,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Lead{}, ErrNotFound
+		}
+		return domain.Lead{}, err
+	}
+	lead.CreatedAt = parseTime(createdAt)
+	lead.UpdatedAt = parseTime(updatedAt)
+	return lead, nil
+}
+
+func scanLeadsWithCount(rows *sql.Rows) ([]domain.Lead, error) {
+	leads := []domain.Lead{}
+	for rows.Next() {
+		lead, err := scanLeadWithCount(rows)
+		if err != nil {
+			return nil, err
+		}
+		leads = append(leads, lead)
+	}
+	return leads, rows.Err()
+}
+
+func scanLeadWithPartnersWithCount(rows *sql.Rows) ([]domain.LeadWithPartner, error) {
+	leads := []domain.LeadWithPartner{}
+	for rows.Next() {
+		lead, err := scanLeadWithPartnerRowWithCount(rows)
+		if err != nil {
+			return nil, err
+		}
+		leads = append(leads, lead)
+	}
+	return leads, rows.Err()
+}
+
+func scanLeadWithPartnerRowWithCount(row userAuthScanner) (domain.LeadWithPartner, error) {
+	var item domain.LeadWithPartner
+	var createdAt, updatedAt string
+	if err := row.Scan(
+		&item.ID, &item.PartnerID, &item.CompanyName, &item.ContactName,
+		&item.ContactEmail, &item.ContactPhone, &item.ServiceType, &item.Budget,
+		&item.NeedSummary, &item.Notes, &item.Status,
+		&item.QualificationScore, &item.QualificationNote,
+		&createdAt, &updatedAt,
+		&item.PartnerName, &item.PartnerEmail, &item.PartnerCode,
+		&item.UnreadCount, &item.MessageCount, &item.MeetingMessage,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.LeadWithPartner{}, ErrNotFound
+		}
+		return domain.LeadWithPartner{}, err
+	}
+	item.CreatedAt = parseTime(createdAt)
+	item.UpdatedAt = parseTime(updatedAt)
+	return item, nil
+}
+
 func scanLeadWithPartners(rows *sql.Rows) ([]domain.LeadWithPartner, error) {
 	leads := []domain.LeadWithPartner{}
 	for rows.Next() {
@@ -1100,7 +1334,7 @@ func intToBool(value int) bool {
 }
 
 func (s *Store) Cleanup(ctx context.Context) error {
-	tables := []string{"lead_events", "leads", "referrals", "users", "service_catalog", "knowledge_articles"}
+	tables := []string{"lead_messages", "lead_events", "leads", "referrals", "users", "service_catalog", "knowledge_articles"}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

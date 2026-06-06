@@ -3,7 +3,7 @@ import { statusLabels } from "../utils/lead-labels";
 import { cn } from "@/lib/utils";
 
 const styles: Record<LeadStatus, string> = {
-  submitted: "border-border bg-secondary text-foreground",
+  submitted: "border-warning bg-warning/10 text-warning",
   qualified: "border-success bg-success/10 text-success",
   contacted: "border-accent bg-accent/10 text-foreground",
   won: "border-success bg-success text-primary-foreground",
@@ -11,10 +11,11 @@ const styles: Record<LeadStatus, string> = {
   rejected: "border-destructive bg-destructive/10 text-destructive",
 };
 
-export function StatusBadge({ status }: { status: LeadStatus }) {
+export function StatusBadge({ status, className }: { status: LeadStatus; className?: string }) {
   return (
-    <span className={cn("inline-flex rounded-lg border px-2.5 py-1 text-xs font-semibold", styles[status])}>
+    <span className={cn("inline-flex rounded-lg border px-2.5 py-1 text-xs font-semibold shrink-0", styles[status], className)}>
       {statusLabels[status]}
     </span>
   );
 }
+

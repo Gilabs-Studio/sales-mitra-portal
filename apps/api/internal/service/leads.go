@@ -101,8 +101,10 @@ func qualifyLead(input LeadInput, rule domain.ServiceRule) (domain.LeadStatus, i
 		return domain.LeadStatusSubmitted, 72, "Budget belum diketahui, tetapi kebutuhan cukup untuk discovery awal"
 	}
 
+	// Do NOT auto-reject — let admin review and decide.
+	// Leads with budget below minimum are submitted for manual review.
 	if rule.MinimumBudget > 0 && input.Budget < rule.MinimumBudget {
-		return domain.LeadStatusRejected, 32, "Budget di bawah kriteria minimum untuk layanan ini"
+		return domain.LeadStatusSubmitted, 45, "Budget di bawah kriteria minimum, menunggu review admin untuk keputusan akhir"
 	}
 
 	if rule.RequiresDiscovery && len(input.NeedSummary) >= 30 {

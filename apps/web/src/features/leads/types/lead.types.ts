@@ -16,6 +16,9 @@ export type Lead = {
   status: LeadStatus;
   qualificationScore: number;
   qualificationNote: string;
+  unreadCount: number;
+  messageCount: number;
+  meetingMessage?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -24,6 +27,30 @@ export type LeadWithPartner = Lead & {
   partnerName: string;
   partnerEmail: string;
   partnerCode: string;
+  unreadCount: number;
+  messageCount: number;
+  meetingMessage?: string;
+};
+
+export type LeadEvent = {
+  id: string;
+  leadId: string;
+  actorId: string;
+  actorName: string;
+  status: LeadStatus;
+  note: string;
+  createdAt: string;
+};
+
+export type LeadMessage = {
+  id: string;
+  leadId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: "admin" | "partner";
+  message: string;
+  isRead: boolean;
+  createdAt: string;
 };
 
 export type CreateLeadPayload = {
@@ -40,7 +67,19 @@ export type CreateLeadPayload = {
 export type LeadFilters = {
   status?: LeadStatus | "";
   serviceType?: ServiceType | "";
-  limit?: number;
+  page?: number;
+  pageSize?: number;
+};
+
+export type PaginationMeta = {
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export type PaginatedLeads<T> = PaginationMeta & {
+  data: T[];
 };
 
 export type UpdateLeadStatusPayload = {

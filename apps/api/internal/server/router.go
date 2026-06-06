@@ -80,12 +80,22 @@ func NewRouter(
 	partner.GET("/dashboard", handler.partnerDashboard)
 	partner.GET("/leads", handler.partnerLeads)
 	partner.POST("/leads", handler.createPartnerLead)
+	partner.GET("/leads/:id", handler.partnerLeadDetail)
+	partner.GET("/leads/:id/events", handler.leadEvents)
+	partner.GET("/leads/:id/messages", handler.listMessages)
+	partner.POST("/leads/:id/messages", handler.sendPartnerMessage)
+	partner.GET("/leads/:id/ws", handler.wsLeadChat)
 	partner.GET("/referrals", handler.partnerReferrals)
 
 	admin := protected.Group("/admin")
 	admin.Use(requireRole(domain.RoleAdmin))
 	admin.GET("/dashboard", handler.adminDashboard)
 	admin.GET("/leads", handler.adminLeads)
+	admin.GET("/leads/:id", handler.adminLeadDetail)
+	admin.GET("/leads/:id/events", handler.leadEvents)
+	admin.GET("/leads/:id/messages", handler.listMessages)
+	admin.POST("/leads/:id/messages", handler.sendAdminMessage)
+	admin.GET("/leads/:id/ws", handler.wsLeadChat)
 	admin.PATCH("/leads/:id/status", handler.updateLeadStatus)
 	admin.GET("/partners", handler.adminPartners)
 	admin.GET("/services", handler.adminServices)
@@ -224,12 +234,31 @@ func (h Handler) partnerDashboard(c *gin.Context) {
 
 func (h Handler) partnerLeads(c *gin.Context) {
 	user := currentUser(c)
-	leads, err := h.store.ListPartnerLeads(c.Request.Context(), user.ID, leadFilters(c))
+	filters := leadFilters(c)
+	leads, total, err := h.store.ListPartnerLeads(c.Request.Context(), user.ID, filters)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	httpx.OK(c, "Daftar lead mitra", leads)
+	httpx.OK(c, "Daftar lead mitra", gin.H{
+		"data":      leads,
+		"total":     total,
+		"page":      filters.Offset/normalizePageSize(filters.Limit) + 1,
+		"pageSize":  normalizePageSize(filters.Limit),
+		"totalPages": ceilDiv(total, normalizePageSize(filters.Limit)),
+	})
+}
+
+func (h Handler) partnerLeadDetail(c *gin.Context) {
+	user := currentUser(c)
+	lead, err := h.store.GetLeadByID(c.Request.Context(), c.Param("id"), user.ID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	// Mark admin messages as read when partner opens the detail
+	_ = h.store.MarkMessagesRead(c.Request.Context(), c.Param("id"), "partner")
+	httpx.OK(c, "Detail lead mitra", lead)
 }
 
 func (h Handler) createPartnerLead(c *gin.Context) {
@@ -266,12 +295,30 @@ func (h Handler) adminDashboard(c *gin.Context) {
 }
 
 func (h Handler) adminLeads(c *gin.Context) {
-	leads, err := h.store.ListAdminLeads(c.Request.Context(), leadFilters(c))
+	filters := leadFilters(c)
+	leads, total, err := h.store.ListAdminLeads(c.Request.Context(), filters)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	httpx.OK(c, "Daftar lead admin", leads)
+	httpx.OK(c, "Daftar lead admin", gin.H{
+		"data":      leads,
+		"total":     total,
+		"page":      filters.Offset/normalizePageSize(filters.Limit) + 1,
+		"pageSize":  normalizePageSize(filters.Limit),
+		"totalPages": ceilDiv(total, normalizePageSize(filters.Limit)),
+	})
+}
+
+func (h Handler) adminLeadDetail(c *gin.Context) {
+	lead, err := h.store.GetLeadWithPartner(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	// Mark partner messages as read when admin opens the detail
+	_ = h.store.MarkMessagesRead(c.Request.Context(), c.Param("id"), "admin")
+	httpx.OK(c, "Detail lead admin", lead)
 }
 
 func (h Handler) updateLeadStatus(c *gin.Context) {
@@ -350,6 +397,9 @@ func (h Handler) requireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := bearerToken(c.GetHeader("Authorization"))
 		if token == "" {
+			token = c.Query("token")
+		}
+		if token == "" {
 			httpx.Fail(c, httpx.Unauthorized("Authorization bearer token wajib dikirim"))
 			c.Abort()
 			return
@@ -372,6 +422,83 @@ func (h Handler) requireAuth() gin.HandlerFunc {
 		c.Set(currentUserKey, user)
 		c.Next()
 	}
+}
+
+func (h Handler) leadEvents(c *gin.Context) {
+	events, err := h.store.ListLeadEvents(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Timeline lead", events)
+}
+
+func (h Handler) listMessages(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "15"))
+	if limit <= 0 {
+		limit = 15
+	}
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if offset < 0 {
+		offset = 0
+	}
+
+	msgs, err := h.store.ListMessages(c.Request.Context(), c.Param("id"), limit, offset)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Pesan lead", msgs)
+}
+
+func (h Handler) sendPartnerMessage(c *gin.Context) {
+	var body struct {
+		Message string `json:"message"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Message) == "" {
+		httpx.Fail(c, httpx.BadRequest("Pesan tidak boleh kosong", ""))
+		return
+	}
+	user := currentUser(c)
+	msg, err := h.store.SendMessage(c.Request.Context(), domain.LeadMessage{
+		LeadID:     c.Param("id"),
+		SenderID:   user.ID,
+		SenderName: user.Name,
+		SenderRole: "partner",
+		Message:    strings.TrimSpace(body.Message),
+	})
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	// Broadcast to WebSocket subscribers
+	hub.broadcast(c.Param("id"), gin.H{"type": "message", "data": msg})
+	httpx.Created(c, "Pesan terkirim", msg)
+}
+
+func (h Handler) sendAdminMessage(c *gin.Context) {
+	var body struct {
+		Message string `json:"message"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Message) == "" {
+		httpx.Fail(c, httpx.BadRequest("Pesan tidak boleh kosong", ""))
+		return
+	}
+	user := currentUser(c)
+	msg, err := h.store.SendMessage(c.Request.Context(), domain.LeadMessage{
+		LeadID:     c.Param("id"),
+		SenderID:   user.ID,
+		SenderName: user.Name,
+		SenderRole: "admin",
+		Message:    strings.TrimSpace(body.Message),
+	})
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	// Broadcast to WebSocket subscribers
+	hub.broadcast(c.Param("id"), gin.H{"type": "message", "data": msg})
+	httpx.Created(c, "Pesan terkirim", msg)
 }
 
 func requireRole(role domain.Role) gin.HandlerFunc {
@@ -407,10 +534,40 @@ func bearerToken(header string) string {
 }
 
 func leadFilters(c *gin.Context) store.LeadFilters {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 20
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	// Legacy support for "limit" query param
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	if limit > 0 {
+		pageSize = limit
+	}
 	return store.LeadFilters{
 		Status:      strings.TrimSpace(c.Query("status")),
 		ServiceType: strings.TrimSpace(c.Query("serviceType")),
-		Limit:       limit,
+		Limit:       pageSize,
+		Offset:      (page - 1) * pageSize,
 	}
+}
+
+func normalizePageSize(limit int) int {
+	if limit <= 0 {
+		return 20
+	}
+	if limit > 100 {
+		return 100
+	}
+	return limit
+}
+
+func ceilDiv(a, b int) int {
+	if b == 0 {
+		return 1
+	}
+	return (a + b - 1) / b
 }

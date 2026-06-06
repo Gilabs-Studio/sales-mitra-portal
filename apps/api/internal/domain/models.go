@@ -70,24 +70,42 @@ type Lead struct {
 	Status             LeadStatus  `json:"status"`
 	QualificationScore int         `json:"qualificationScore"`
 	QualificationNote  string      `json:"qualificationNote"`
+	UnreadCount        int         `json:"unreadCount"`
+	MessageCount       int         `json:"messageCount"`
+	MeetingMessage     string      `json:"meetingMessage"`
 	CreatedAt          time.Time   `json:"createdAt"`
 	UpdatedAt          time.Time   `json:"updatedAt"`
 }
 
 type LeadWithPartner struct {
 	Lead
-	PartnerName  string `json:"partnerName"`
-	PartnerEmail string `json:"partnerEmail"`
-	PartnerCode  string `json:"partnerCode"`
+	PartnerName    string `json:"partnerName"`
+	PartnerEmail   string `json:"partnerEmail"`
+	PartnerCode    string `json:"partnerCode"`
+	UnreadCount    int    `json:"unreadCount"`
+	MessageCount   int    `json:"messageCount"`
+	MeetingMessage string `json:"meetingMessage"`
 }
 
 type LeadEvent struct {
 	ID        string     `json:"id"`
 	LeadID    string     `json:"leadId"`
 	ActorID   string     `json:"actorId"`
+	ActorName string     `json:"actorName"`
 	Status    LeadStatus `json:"status"`
 	Note      string     `json:"note"`
 	CreatedAt time.Time  `json:"createdAt"`
+}
+
+type LeadMessage struct {
+	ID         string    `json:"id"`
+	LeadID     string    `json:"leadId"`
+	SenderID   string    `json:"senderId"`
+	SenderName string    `json:"senderName"`
+	SenderRole string    `json:"senderRole"`
+	Message    string    `json:"message"`
+	IsRead     bool      `json:"isRead"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 type Referral struct {
