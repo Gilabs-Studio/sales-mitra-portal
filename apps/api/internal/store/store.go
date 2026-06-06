@@ -42,6 +42,15 @@ type LeadFilters struct {
 	Limit       int
 }
 
+type ServiceRuleInput struct {
+	Type              domain.ServiceType
+	Label             string
+	Description       string
+	MinimumBudget     int64
+	RequiresDiscovery bool
+	IsActive          bool
+}
+
 func Open(databaseURL string) (*sql.DB, error) {
 	if strings.HasPrefix(databaseURL, "file:") && !strings.Contains(databaseURL, "mode=memory") {
 		path := strings.TrimPrefix(databaseURL, "file:")
@@ -75,15 +84,26 @@ func New(db *sql.DB) *Store {
 }
 
 func (s *Store) Migrate() error {
-	statements := []string{
+	tables := []string{
 		`CREATE TABLE IF NOT EXISTS users (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
+			username TEXT NOT NULL DEFAULT '',
 			email TEXT NOT NULL UNIQUE,
 			password_hash TEXT NOT NULL,
 			role TEXT NOT NULL CHECK (role IN ('admin', 'partner')),
 			partner_code TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS service_catalog (
+			type TEXT PRIMARY KEY,
+			label TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			minimum_budget INTEGER NOT NULL DEFAULT 0,
+			requires_discovery INTEGER NOT NULL DEFAULT 0,
+			is_active INTEGER NOT NULL DEFAULT 1,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
 		)`,
 		`CREATE TABLE IF NOT EXISTS leads (
 			id TEXT PRIMARY KEY,
@@ -102,8 +122,6 @@ func (s *Store) Migrate() error {
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		)`,
-		`CREATE INDEX IF NOT EXISTS idx_leads_partner_status_created ON leads(partner_id, status, created_at DESC)`,
-		`CREATE INDEX IF NOT EXISTS idx_leads_status_service_created ON leads(status, service_type, created_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS lead_events (
 			id TEXT PRIMARY KEY,
 			lead_id TEXT NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
@@ -112,7 +130,6 @@ func (s *Store) Migrate() error {
 			note TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL
 		)`,
-		`CREATE INDEX IF NOT EXISTS idx_lead_events_lead_created ON lead_events(lead_id, created_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS referrals (
 			id TEXT PRIMARY KEY,
 			partner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -121,7 +138,6 @@ func (s *Store) Migrate() error {
 			usage_count INTEGER NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL
 		)`,
-		`CREATE INDEX IF NOT EXISTS idx_referrals_partner ON referrals(partner_id)`,
 		`CREATE TABLE IF NOT EXISTS knowledge_articles (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
@@ -131,26 +147,86 @@ func (s *Store) Migrate() error {
 		)`,
 	}
 
+	indexes := []string{
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_unique ON users(username) WHERE username <> ''`,
+		`CREATE INDEX IF NOT EXISTS idx_service_catalog_active_label ON service_catalog(is_active, label)`,
+		`CREATE INDEX IF NOT EXISTS idx_leads_partner_status_created ON leads(partner_id, status, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_leads_status_service_created ON leads(status, service_type, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_lead_events_lead_created ON lead_events(lead_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_referrals_partner ON referrals(partner_id)`,
+	}
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	for _, statement := range statements {
+	for _, statement := range tables {
 		if _, err := tx.Exec(statement); err != nil {
 			return err
 		}
 	}
 
-	if err := seedKnowledge(tx); err != nil {
+	if err := addColumnIfMissing(tx, "users", "username", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
+	}
+
+	for _, statement := range indexes {
+		if _, err := tx.Exec(statement); err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit()
 }
 
-func seedKnowledge(tx *sql.Tx) error {
+func addColumnIfMissing(tx *sql.Tx, table string, column string, definition string) error {
+	if !isSafeIdentifier(table) || !isSafeIdentifier(column) {
+		return fmt.Errorf("unsafe migration identifier")
+	}
+	rows, err := tx.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name string
+		var columnType string
+		var notNull int
+		var defaultValue sql.NullString
+		var primaryKey int
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return err
+		}
+		if name == column {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`ALTER TABLE ` + table + ` ADD COLUMN ` + column + ` ` + definition)
+	return err
+}
+
+func isSafeIdentifier(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, char := range value {
+		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '_' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func (s *Store) SeedKnowledge(ctx context.Context) error {
 	now := nowString()
 	articles := []domain.KnowledgeArticle{
 		{
@@ -180,7 +256,8 @@ func seedKnowledge(tx *sql.Tx) error {
 	}
 
 	for _, article := range articles {
-		if _, err := tx.Exec(
+		if _, err := s.db.ExecContext(
+			ctx,
 			`INSERT OR IGNORE INTO knowledge_articles (id, title, category, content, created_at)
 			 VALUES (?, ?, ?, ?, ?)`,
 			article.ID,
@@ -198,10 +275,11 @@ func seedKnowledge(tx *sql.Tx) error {
 func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash string) error {
 	_, err := s.db.ExecContext(
 		ctx,
-		`INSERT INTO users (id, name, email, password_hash, role, partner_code, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO users (id, name, username, email, password_hash, role, partner_code, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		user.ID,
 		user.Name,
+		strings.ToLower(user.Username),
 		strings.ToLower(user.Email),
 		passwordHash,
 		user.Role,
@@ -214,7 +292,7 @@ func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash s
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (domain.UserAuth, error) {
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, name, email, password_hash, role, partner_code, created_at
+		`SELECT id, name, username, email, password_hash, role, partner_code, created_at
 		 FROM users
 		 WHERE email = ?`,
 		strings.ToLower(email),
@@ -222,10 +300,23 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (domain.UserAu
 	return scanUserAuth(row)
 }
 
+func (s *Store) GetUserByLogin(ctx context.Context, login string) (domain.UserAuth, error) {
+	login = strings.ToLower(strings.TrimSpace(login))
+	row := s.db.QueryRowContext(
+		ctx,
+		`SELECT id, name, username, email, password_hash, role, partner_code, created_at
+		 FROM users
+		 WHERE email = ? OR username = ?`,
+		login,
+		login,
+	)
+	return scanUserAuth(row)
+}
+
 func (s *Store) GetUserByID(ctx context.Context, id string) (domain.User, error) {
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, name, email, role, partner_code, created_at
+		`SELECT id, name, username, email, role, partner_code, created_at
 		 FROM users
 		 WHERE id = ?`,
 		id,
@@ -233,7 +324,7 @@ func (s *Store) GetUserByID(ctx context.Context, id string) (domain.User, error)
 
 	var user domain.User
 	var createdAt string
-	if err := row.Scan(&user.ID, &user.Name, &user.Email, &user.Role, &user.PartnerCode, &createdAt); err != nil {
+	if err := row.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &createdAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.User{}, ErrNotFound
 		}
@@ -241,6 +332,123 @@ func (s *Store) GetUserByID(ctx context.Context, id string) (domain.User, error)
 	}
 	user.CreatedAt = parseTime(createdAt)
 	return user, nil
+}
+
+func (s *Store) SetUsernameByEmail(ctx context.Context, email string, username string) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`UPDATE users
+		 SET username = ?
+		 WHERE email = ?`,
+		strings.ToLower(strings.TrimSpace(username)),
+		strings.ToLower(strings.TrimSpace(email)),
+	)
+	return err
+}
+
+func (s *Store) SeedServiceCatalog(ctx context.Context, services []domain.ServiceRule) error {
+	for _, service := range services {
+		if _, err := s.db.ExecContext(
+			ctx,
+			`INSERT INTO service_catalog (
+				type, label, description, minimum_budget, requires_discovery, is_active, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(type) DO NOTHING`,
+			service.Type,
+			service.Label,
+			service.Description,
+			service.MinimumBudget,
+			boolToInt(service.RequiresDiscovery),
+			boolToInt(service.IsActive),
+			formatTime(service.CreatedAt),
+			formatTime(service.UpdatedAt),
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) ListServiceCatalog(ctx context.Context, includeInactive bool) ([]domain.ServiceRule, error) {
+	query := `SELECT type, label, description, minimum_budget, requires_discovery, is_active, created_at, updated_at
+		FROM service_catalog`
+	args := []interface{}{}
+	if !includeInactive {
+		query += " WHERE is_active = ?"
+		args = append(args, 1)
+	}
+	query += " ORDER BY label ASC"
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	services := []domain.ServiceRule{}
+	for rows.Next() {
+		service, err := scanServiceRule(rows)
+		if err != nil {
+			return nil, err
+		}
+		services = append(services, service)
+	}
+	return services, rows.Err()
+}
+
+func (s *Store) GetServiceRule(ctx context.Context, serviceType domain.ServiceType) (domain.ServiceRule, error) {
+	row := s.db.QueryRowContext(
+		ctx,
+		`SELECT type, label, description, minimum_budget, requires_discovery, is_active, created_at, updated_at
+		 FROM service_catalog
+		 WHERE type = ?`,
+		serviceType,
+	)
+	return scanServiceRule(row)
+}
+
+func (s *Store) UpsertServiceRule(ctx context.Context, input ServiceRuleInput) (domain.ServiceRule, error) {
+	now := time.Now().UTC()
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO service_catalog (
+			type, label, description, minimum_budget, requires_discovery, is_active, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(type) DO UPDATE SET
+			label = excluded.label,
+			description = excluded.description,
+			minimum_budget = excluded.minimum_budget,
+			requires_discovery = excluded.requires_discovery,
+			is_active = excluded.is_active,
+			updated_at = excluded.updated_at`,
+		input.Type,
+		input.Label,
+		input.Description,
+		input.MinimumBudget,
+		boolToInt(input.RequiresDiscovery),
+		boolToInt(input.IsActive),
+		formatTime(now),
+		formatTime(now),
+	)
+	if err != nil {
+		return domain.ServiceRule{}, err
+	}
+	return s.GetServiceRule(ctx, input.Type)
+}
+
+func (s *Store) DeleteServiceRule(ctx context.Context, serviceType domain.ServiceType) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM service_catalog WHERE type = ?`, serviceType)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) CreateReferral(ctx context.Context, referral domain.Referral) error {
@@ -549,7 +757,7 @@ func (s *Store) GetAdminDashboard(ctx context.Context) (domain.AdminDashboard, e
 func (s *Store) ListPartnersWithStats(ctx context.Context) ([]domain.PartnerWithStats, error) {
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT u.id, u.name, u.email, u.role, u.partner_code, u.created_at,
+		`SELECT u.id, u.name, u.username, u.email, u.role, u.partner_code, u.created_at,
 			COUNT(l.id) AS total_leads,
 			COALESCE(SUM(CASE WHEN l.status = 'qualified' THEN 1 ELSE 0 END), 0) AS qualified_leads,
 			COALESCE(SUM(CASE WHEN l.status = 'won' THEN 1 ELSE 0 END), 0) AS won_leads,
@@ -572,6 +780,7 @@ func (s *Store) ListPartnersWithStats(ctx context.Context) ([]domain.PartnerWith
 		if err := rows.Scan(
 			&partner.ID,
 			&partner.Name,
+			&partner.Username,
 			&partner.Email,
 			&partner.Role,
 			&partner.PartnerCode,
@@ -676,6 +885,7 @@ func scanUserAuth(row userAuthScanner) (domain.UserAuth, error) {
 	if err := row.Scan(
 		&user.ID,
 		&user.Name,
+		&user.Username,
 		&user.Email,
 		&user.PasswordHash,
 		&user.Role,
@@ -689,6 +899,34 @@ func scanUserAuth(row userAuthScanner) (domain.UserAuth, error) {
 	}
 	user.CreatedAt = parseTime(createdAt)
 	return user, nil
+}
+
+func scanServiceRule(row userAuthScanner) (domain.ServiceRule, error) {
+	var service domain.ServiceRule
+	var requiresDiscovery int
+	var isActive int
+	var createdAt string
+	var updatedAt string
+	if err := row.Scan(
+		&service.Type,
+		&service.Label,
+		&service.Description,
+		&service.MinimumBudget,
+		&requiresDiscovery,
+		&isActive,
+		&createdAt,
+		&updatedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ServiceRule{}, ErrNotFound
+		}
+		return domain.ServiceRule{}, err
+	}
+	service.RequiresDiscovery = intToBool(requiresDiscovery)
+	service.IsActive = intToBool(isActive)
+	service.CreatedAt = parseTime(createdAt)
+	service.UpdatedAt = parseTime(updatedAt)
+	return service, nil
 }
 
 func scanLeads(rows *sql.Rows) ([]domain.Lead, error) {
@@ -824,6 +1062,7 @@ func labelServices(items []domain.BreakdownItem) []domain.BreakdownItem {
 		string(domain.ServiceWebsiteApp):     "Website/App",
 		string(domain.ServiceCustomSoftware): "Custom Software",
 		string(domain.ServiceSalesView):      "SalesView",
+		string(domain.ServiceOther):          "Lainnya",
 	}
 	return labelBreakdowns(items, labels)
 }
@@ -847,4 +1086,40 @@ func PartnerCode(name string, seed string) string {
 		normalized = "MITRA"
 	}
 	return fmt.Sprintf("%s-%s", strings.ToUpper(seed), normalized)
+}
+
+func boolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
+}
+
+func intToBool(value int) bool {
+	return value == 1
+}
+
+func (s *Store) Cleanup(ctx context.Context) error {
+	tables := []string{"lead_events", "leads", "referrals", "users", "service_catalog", "knowledge_articles"}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, "PRAGMA foreign_keys = OFF"); err != nil {
+		return err
+	}
+
+	for _, table := range tables {
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf("DELETE FROM %s", table)); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

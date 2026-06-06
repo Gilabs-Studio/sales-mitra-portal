@@ -25,7 +25,7 @@ export function PartnerStatsPanel() {
             </div>
           </div>
         ))}
-        {partners.data?.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada mitra.</p> : null}
+        {partners.data?.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada mitra</p> : null}
       </div>
     </section>
   );

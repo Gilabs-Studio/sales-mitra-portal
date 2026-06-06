@@ -23,11 +23,11 @@ export function PartnerLeadsScreen() {
           <div>
             <h1 className="text-3xl font-extrabold text-foreground">Lead Anda</h1>
             <p className="mt-2 font-serif text-lg leading-7 text-muted-foreground">
-              Semua prospek tersimpan dengan hasil kualifikasi otomatis.
+              Semua prospek tersimpan dengan hasil kualifikasi otomatis dan tracking yang transparan
             </p>
           </div>
           <LeadFilters />
-          {leads.isError ? <p className="text-sm font-semibold text-destructive">Lead gagal dimuat.</p> : null}
+          {leads.isError ? <p className="text-sm font-semibold text-destructive">Lead gagal dimuat</p> : null}
           <LeadTable leads={leads.data ?? []} />
         </section>
       </div>

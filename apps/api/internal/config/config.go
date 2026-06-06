@@ -16,12 +16,15 @@ type Config struct {
 	WebOrigin        string
 	WebOrigins       []string
 	AdminName        string
+	AdminUsername    string
 	AdminEmail       string
 	AdminPassword    string
 	DemoPartnerName  string
 	DemoPartnerEmail string
 	DemoPartnerPass  string
 	ReferralCodeSeed string
+	RunSeeder        bool
+	RunCleanup       bool
 }
 
 func Load() Config {
@@ -37,12 +40,15 @@ func Load() Config {
 		WebOrigin:        webOrigin,
 		WebOrigins:       originsEnv("WEB_ORIGIN", webOrigin),
 		AdminName:        env("ADMIN_NAME", "GiLabs Admin"),
+		AdminUsername:    strings.ToLower(env("ADMIN_USERNAME", "admin")),
 		AdminEmail:       strings.ToLower(env("ADMIN_EMAIL", "admin@gilabs.local")),
-		AdminPassword:    env("ADMIN_PASSWORD", "admin12345"),
+		AdminPassword:    env("ADMIN_PASSWORD", ""),
 		DemoPartnerName:  env("DEMO_PARTNER_NAME", "Mitra Demo"),
 		DemoPartnerEmail: strings.ToLower(env("DEMO_PARTNER_EMAIL", "mitra@gilabs.local")),
-		DemoPartnerPass:  env("DEMO_PARTNER_PASSWORD", "mitra12345"),
+		DemoPartnerPass:  env("DEMO_PARTNER_PASSWORD", ""),
 		ReferralCodeSeed: env("REFERRAL_CODE_SEED", "GILABS"),
+		RunSeeder:        boolEnv("RUN_SEEDER", true),
+		RunCleanup:       boolEnv("RUN_CLEANUP", false),
 	}
 }
 
@@ -81,4 +87,12 @@ func durationEnv(key string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return duration
+}
+
+func boolEnv(key string, fallback bool) bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	if value == "" {
+		return fallback
+	}
+	return value == "true" || value == "1" || value == "yes"
 }

@@ -3,7 +3,7 @@ import { LoginForm } from "@/features/auth/components/login-form";
 
 export default function LoginPage() {
   return (
-    <AuthShell title="Masuk ke portal" description="Gunakan akun admin atau mitra untuk mengakses dashboard.">
+    <AuthShell title="Masuk ke portal" description="Gunakan akun admin atau mitra untuk mengakses dashboard">
       <LoginForm />
     </AuthShell>
   );

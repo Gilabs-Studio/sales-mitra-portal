@@ -14,10 +14,9 @@ pnpm install
 pnpm dev
 ```
 
-Demo credential:
+Default auth dibuat oleh seeder dari env `ADMIN_USERNAME`, `ADMIN_EMAIL`, dan `ADMIN_PASSWORD` di `apps/api/.env`
 
-- Admin: `admin@gilabs.local` / `admin12345`
-- Mitra: `mitra@gilabs.local` / `mitra12345`
+Demo mitra opsional dibuat jika `DEMO_PARTNER_EMAIL` dan `DEMO_PARTNER_PASSWORD` tersedia di env
 
 Jika binary `go` dari Snap bermasalah, jalankan API dengan path langsung:
 

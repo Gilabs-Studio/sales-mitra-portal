@@ -16,7 +16,7 @@ export function useLoginForm() {
   const locale = useLocale();
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "mitra@gilabs.local", password: "mitra12345" },
+    defaultValues: { email: "", password: "" },
   });
 
   const mutation = useMutation({

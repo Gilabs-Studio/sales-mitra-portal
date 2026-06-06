@@ -23,10 +23,10 @@ export default function HomePage() {
         <div className="flex flex-col justify-center">
           <p className="text-sm font-semibold uppercase text-muted-foreground">Partner-led growth</p>
           <h1 className="mt-4 max-w-3xl text-5xl font-bold leading-[1.04] text-foreground md:text-6xl">
-            Ekosistem mitra untuk akuisisi prospek yang scalable.
+            Kemitraan IT untuk komisi project yang lebih transparan
           </h1>
           <p className="mt-6 max-w-2xl font-serif text-xl leading-8 text-muted-foreground">
-            Siapa pun dapat daftar sebagai mitra, submit lead, memakai referral code, dan belajar layanan GiLabs dari knowledge center.
+            Daftar sebagai mitra GiLabs, submit lead software, pantau status prospek, dan buka peluang passive income dari jaringan Anda
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
@@ -54,6 +54,7 @@ export default function HomePage() {
               ["Company Profile", "Budget >= Rp10 juta", "Qualified"],
               ["Website/App", "Budget >= Rp15 juta", "Qualified"],
               ["Custom Software", "Discovery form lengkap", "Submitted"],
+              ["Lainnya", "Kebutuhan dikurasi admin", "Discovery"],
             ].map(([service, rule, status]) => (
               <div key={service} className="grid grid-cols-[1fr_auto] gap-4 rounded-lg border border-border bg-secondary p-4">
                 <div>
@@ -71,9 +72,9 @@ export default function HomePage() {
       <section className="border-t border-border bg-secondary">
         <div className="mx-auto grid max-w-7xl gap-4 px-5 py-8 md:grid-cols-3">
           {[
-            { Icon: Users, title: "Mitra organik", body: "Registrasi mandiri tanpa interview dan onboarding panjang." },
-            { Icon: ShieldCheck, title: "Filter lead", body: "Budget dan kebutuhan disaring sebelum tim internal turun meeting." },
-            { Icon: Bot, title: "Knowledge + chatbot", body: "Mitra bisa belajar produk, pricing, referral, dan studi kasus." },
+            { Icon: Users, title: "Mitra organik", body: "Registrasi mandiri tanpa interview dan onboarding panjang" },
+            { Icon: ShieldCheck, title: "Filter lead", body: "Budget dan kebutuhan disaring sebelum tim internal turun meeting" },
+            { Icon: Bot, title: "Knowledge + chatbot", body: "Mitra belajar layanan, pricing, referral, dan studi kasus" },
           ].map(({ Icon, title, body }) => (
             <article key={title} className="rounded-lg border border-border bg-card p-5">
               <Icon className="h-5 w-5" aria-hidden="true" />

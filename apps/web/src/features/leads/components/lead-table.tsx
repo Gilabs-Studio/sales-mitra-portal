@@ -1,5 +1,5 @@
 import type { Lead, LeadWithPartner } from "../types/lead.types";
-import { serviceLabels } from "../utils/lead-labels";
+import { serviceLabel } from "../utils/lead-labels";
 import { StatusBadge } from "./status-badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -13,7 +13,7 @@ export function LeadTable<TLead extends Lead | LeadWithPartner>({ leads, showPar
   if (leads.length === 0) {
     return (
       <div className="rounded-lg border border-border bg-card p-6 text-sm leading-6 text-muted-foreground">
-        Belum ada lead untuk filter ini.
+        Belum ada lead untuk filter ini
       </div>
     );
   }
@@ -49,7 +49,7 @@ export function LeadTable<TLead extends Lead | LeadWithPartner>({ leads, showPar
                   <div className="text-xs text-muted-foreground">{"partnerCode" in lead ? lead.partnerCode : "-"}</div>
                 </td>
               ) : null}
-              <td className="border-b border-border px-4 py-3">{serviceLabels[lead.serviceType]}</td>
+              <td className="border-b border-border px-4 py-3">{serviceLabel(lead.serviceType)}</td>
               <td className="border-b border-border px-4 py-3">{lead.budget > 0 ? formatCurrency(lead.budget) : "Discovery"}</td>
               <td className="border-b border-border px-4 py-3">
                 <StatusBadge status={lead.status} />

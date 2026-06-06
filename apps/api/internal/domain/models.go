@@ -16,6 +16,7 @@ const (
 	ServiceWebsiteApp     ServiceType = "website_app"
 	ServiceCustomSoftware ServiceType = "custom_software"
 	ServiceSalesView      ServiceType = "salesview"
+	ServiceOther          ServiceType = "other"
 )
 
 type LeadStatus string
@@ -32,6 +33,7 @@ const (
 type User struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
+	Username    string    `json:"username"`
 	Email       string    `json:"email"`
 	Role        Role      `json:"role"`
 	PartnerCode string    `json:"partnerCode"`
@@ -49,6 +51,9 @@ type ServiceRule struct {
 	Description       string      `json:"description"`
 	MinimumBudget     int64       `json:"minimumBudget"`
 	RequiresDiscovery bool        `json:"requiresDiscovery"`
+	IsActive          bool        `json:"isActive"`
+	CreatedAt         time.Time   `json:"createdAt"`
+	UpdatedAt         time.Time   `json:"updatedAt"`
 }
 
 type Lead struct {

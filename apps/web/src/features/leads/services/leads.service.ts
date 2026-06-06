@@ -1,17 +1,5 @@
 import { apiClient, unwrapApiResponse, type ApiEnvelope } from "@/lib/api-client";
-import type {
-  CreateLeadPayload,
-  Lead,
-  LeadFilters,
-  LeadWithPartner,
-  ServiceRule,
-  UpdateLeadStatusPayload,
-} from "../types/lead.types";
-
-export async function getServiceCatalog() {
-  const response = await apiClient.get<ApiEnvelope<ServiceRule[]>>("/catalog/services");
-  return unwrapApiResponse(response.data);
-}
+import type { CreateLeadPayload, Lead, LeadFilters, LeadWithPartner, UpdateLeadStatusPayload } from "../types/lead.types";
 
 export async function listPartnerLeads(filters: LeadFilters = {}) {
   const response = await apiClient.get<ApiEnvelope<Lead[]>>("/partner/leads", {

@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, BookOpen, LayoutDashboard, LogOut, Send, Shield } from "lucide-react";
+import { BarChart3, BookOpen, LayoutDashboard, LogOut, Send, Settings2, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, usePathname } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,7 @@ const partnerNav: NavItem[] = [
 const adminNav: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: Shield },
   { href: "/admin/leads", label: "Lead", icon: BarChart3 },
+  { href: "/admin/services", label: "Layanan", icon: Settings2 },
 ];
 
 export function AppShell({ user, children }: AppShellProps) {

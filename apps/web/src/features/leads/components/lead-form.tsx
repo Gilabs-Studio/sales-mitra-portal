@@ -6,7 +6,8 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useCreateLeadForm, useServiceCatalog } from "../hooks/use-leads";
+import { useServiceCatalog } from "@/features/services/hooks/use-services";
+import { useCreateLeadForm } from "../hooks/use-leads";
 import { formatCurrency } from "@/lib/utils";
 
 export function LeadForm() {
@@ -24,7 +25,7 @@ export function LeadForm() {
       <div>
         <h2 className="text-xl font-extrabold text-foreground">Submit lead baru</h2>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          Sistem akan otomatis memberi status kualifikasi berdasarkan tipe layanan dan budget.
+          Sistem otomatis memberi status kualifikasi berdasarkan tipe layanan dan budget
         </p>
       </div>
       <FieldGroup>
@@ -45,7 +46,7 @@ export function LeadForm() {
             </Select>
             {selectedService ? (
               <FieldDescription>
-                Minimal {selectedService.minimumBudget > 0 ? formatCurrency(selectedService.minimumBudget) : "tanpa minimum"}.
+                Minimal {selectedService.minimumBudget > 0 ? formatCurrency(selectedService.minimumBudget) : "tanpa minimum"}
               </FieldDescription>
             ) : null}
           </Field>
@@ -74,7 +75,7 @@ export function LeadForm() {
         <Field>
           <FieldLabel htmlFor="needSummary">Ringkasan kebutuhan</FieldLabel>
           <Textarea id="needSummary" {...register("needSummary")} />
-          <FieldDescription>Wajib detail untuk Custom Software jika budget belum diketahui.</FieldDescription>
+          <FieldDescription>Wajib detail untuk layanan discovery jika budget belum diketahui</FieldDescription>
           {errors.needSummary ? <FieldError>{errors.needSummary.message}</FieldError> : null}
         </Field>
         <Field>

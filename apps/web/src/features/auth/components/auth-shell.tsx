@@ -17,14 +17,14 @@ export function AuthShell({ title, description, children }: AuthShellProps) {
           <div className="max-w-2xl py-12">
             <p className="text-sm font-semibold uppercase text-muted-foreground">Partner ecosystem</p>
             <h1 className="mt-4 max-w-xl text-5xl font-bold leading-[1.05] text-foreground md:text-6xl">
-              Scaling prospek tanpa rekrutmen sales tradisional.
+              Kemitraan IT untuk komisi project yang lebih transparan
             </h1>
             <p className="mt-6 max-w-xl font-serif text-xl leading-8 text-muted-foreground">
-              Mitra bisa submit lead, melihat status pipeline, membaca product knowledge, dan memakai referral code.
+              Submit lead, pantau pipeline, pelajari product knowledge, dan gunakan referral code dari satu partner portal
             </p>
           </div>
           <p className="text-xs leading-5 text-muted-foreground">
-            Demo admin: admin@gilabs.local / admin12345. Demo mitra: mitra@gilabs.local / mitra12345.
+            Kredensial admin default dikelola melalui env dan seeder backend
           </p>
         </section>
         <section className="flex items-center">

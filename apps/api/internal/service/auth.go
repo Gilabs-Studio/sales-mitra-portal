@@ -46,12 +46,8 @@ func NewAuthService(repository *store.Store, cfg config.Config) *AuthService {
 	return &AuthService{store: repository, cfg: cfg}
 }
 
-func (s *AuthService) SeedDefaultUsers() error {
-	ctx := context.Background()
-	if err := s.ensureUser(ctx, s.cfg.AdminName, s.cfg.AdminEmail, s.cfg.AdminPassword, domain.RoleAdmin); err != nil {
-		return err
-	}
-	return s.ensureUser(ctx, s.cfg.DemoPartnerName, s.cfg.DemoPartnerEmail, s.cfg.DemoPartnerPass, domain.RolePartner)
+func (s *AuthService) EnsureUser(ctx context.Context, name string, username string, email string, password string, role domain.Role) error {
+	return s.ensureUser(ctx, name, username, email, password, role)
 }
 
 func (s *AuthService) RegisterPartner(ctx context.Context, input RegisterInput) (AuthResult, error) {
@@ -97,19 +93,19 @@ func (s *AuthService) RegisterPartner(ctx context.Context, input RegisterInput) 
 func (s *AuthService) Login(ctx context.Context, input LoginInput) (AuthResult, error) {
 	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
 	if input.Email == "" || input.Password == "" {
-		return AuthResult{}, httpx.Validation("Email dan password wajib diisi", "")
+		return AuthResult{}, httpx.Validation("Email atau username dan password wajib diisi", "")
 	}
 
-	authUser, err := s.store.GetUserByEmail(ctx, input.Email)
+	authUser, err := s.store.GetUserByLogin(ctx, input.Email)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			return AuthResult{}, httpx.Unauthorized("Email atau password salah")
+			return AuthResult{}, httpx.Unauthorized("Email, username, atau password salah")
 		}
 		return AuthResult{}, err
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(authUser.PasswordHash), []byte(input.Password)); err != nil {
-		return AuthResult{}, httpx.Unauthorized("Email atau password salah")
+		return AuthResult{}, httpx.Unauthorized("Email, username, atau password salah")
 	}
 
 	token, err := s.issueToken(authUser.User)
@@ -150,8 +146,12 @@ func (s *AuthService) ParseToken(tokenValue string) (Claims, error) {
 	return *claims, nil
 }
 
-func (s *AuthService) ensureUser(ctx context.Context, name string, email string, password string, role domain.Role) error {
-	if _, err := s.store.GetUserByEmail(ctx, email); err == nil {
+func (s *AuthService) ensureUser(ctx context.Context, name string, username string, email string, password string, role domain.Role) error {
+	if authUser, err := s.store.GetUserByEmail(ctx, email); err == nil {
+		username = strings.ToLower(strings.TrimSpace(username))
+		if username != "" && authUser.Username == "" {
+			return s.store.SetUsernameByEmail(ctx, email, username)
+		}
 		return nil
 	} else if !errors.Is(err, store.ErrNotFound) {
 		return err
@@ -170,6 +170,7 @@ func (s *AuthService) ensureUser(ctx context.Context, name string, email string,
 	user := domain.User{
 		ID:          uuid.NewString(),
 		Name:        name,
+		Username:    strings.ToLower(strings.TrimSpace(username)),
 		Email:       strings.ToLower(email),
 		Role:        role,
 		PartnerCode: partnerCode,

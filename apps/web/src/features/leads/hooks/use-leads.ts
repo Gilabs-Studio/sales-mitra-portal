@@ -11,16 +11,9 @@ import {
   type UpdateLeadStatusFormValues,
   type UpdateLeadStatusInputValues,
 } from "../schemas/lead.schema";
-import { createLead, getServiceCatalog, listAdminLeads, listPartnerLeads, updateLeadStatus } from "../services/leads.service";
-import type { LeadFilters, LeadStatus, LeadWithPartner, ServiceType } from "../types/lead.types";
+import { createLead, listAdminLeads, listPartnerLeads, updateLeadStatus } from "../services/leads.service";
+import type { LeadFilters, LeadStatus, LeadWithPartner } from "../types/lead.types";
 import { useLeadFilterStore } from "../stores/use-lead-filter-store";
-
-export function useServiceCatalog() {
-  return useQuery({
-    queryKey: ["services"],
-    queryFn: getServiceCatalog,
-  });
-}
 
 export function useLeadFilters() {
   const status = useLeadFilterStore((state) => state.status);
@@ -77,7 +70,7 @@ export function useCreateLeadForm() {
     form,
     isLoading: mutation.isPending,
     errorMessage: mutation.error instanceof Error ? mutation.error.message : "",
-    successMessage: mutation.isSuccess ? "Lead berhasil dikirim dan sudah otomatis dikualifikasi." : "",
+    successMessage: mutation.isSuccess ? "Lead berhasil dikirim dan otomatis masuk pipeline kualifikasi" : "",
     onSubmit: form.handleSubmit((values) => mutation.mutate(values)),
   };
 }
@@ -108,4 +101,3 @@ export function useUpdateLeadStatus(lead: LeadWithPartner) {
 }
 
 export const statusOptions: Array<LeadStatus | ""> = ["", "submitted", "qualified", "contacted", "won", "lost", "rejected"];
-export const serviceOptions: Array<ServiceType | ""> = ["", "company_profile", "website_app", "custom_software", "salesview"];

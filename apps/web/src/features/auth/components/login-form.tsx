@@ -18,8 +18,8 @@ export function LoginForm() {
     <form onSubmit={onSubmit} className="space-y-5">
       <FieldGroup>
         <Field>
-          <FieldLabel htmlFor="email">Email</FieldLabel>
-          <Input id="email" type="email" autoComplete="email" {...register("email")} />
+          <FieldLabel htmlFor="email">Email atau username</FieldLabel>
+          <Input id="email" type="text" autoComplete="username" {...register("email")} />
           {errors.email ? <FieldError>{errors.email.message}</FieldError> : null}
         </Field>
         <Field>

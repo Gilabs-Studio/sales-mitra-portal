@@ -21,11 +21,11 @@ export function AdminLeadsScreen() {
         <div>
           <h1 className="text-3xl font-extrabold text-foreground">Review lead mitra</h1>
           <p className="mt-2 max-w-2xl font-serif text-lg leading-7 text-muted-foreground">
-            Update status pipeline dari satu layar. List memakai endpoint JOIN agar data mitra tidak diambil satu per satu.
+            Update status pipeline dari satu layar dengan endpoint JOIN agar data mitra tidak diambil satu per satu
           </p>
         </div>
         <LeadFilters />
-        {leads.isError ? <p className="text-sm font-semibold text-destructive">Lead gagal dimuat.</p> : null}
+        {leads.isError ? <p className="text-sm font-semibold text-destructive">Lead gagal dimuat</p> : null}
         <LeadTable
           leads={leads.data ?? []}
           showPartner

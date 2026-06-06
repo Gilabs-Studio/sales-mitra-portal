@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/gilabs/mitra-sales-portal/apps/api/internal/domain"
@@ -33,8 +34,8 @@ func NewLeadService(repository *store.Store) *LeadService {
 	return &LeadService{store: repository}
 }
 
-func (s *LeadService) ServiceRules() []domain.ServiceRule {
-	return serviceRules()
+func (s *LeadService) ServiceRules(ctx context.Context) ([]domain.ServiceRule, error) {
+	return s.store.ListServiceCatalog(ctx, false)
 }
 
 func (s *LeadService) CreateLead(ctx context.Context, partnerID string, input LeadInput) (domain.Lead, error) {
@@ -48,17 +49,25 @@ func (s *LeadService) CreateLead(ctx context.Context, partnerID string, input Le
 	if input.CompanyName == "" || input.ContactName == "" || input.ContactEmail == "" {
 		return domain.Lead{}, httpx.Validation("Data lead belum lengkap", "Company name, contact name, dan contact email wajib diisi.")
 	}
-	if !isKnownService(input.ServiceType) {
-		return domain.Lead{}, httpx.Validation("Tipe layanan tidak valid", "")
-	}
 	if input.Budget < 0 {
-		return domain.Lead{}, httpx.Validation("Budget tidak valid", "Budget tidak boleh bernilai negatif.")
-	}
-	if input.ServiceType == domain.ServiceCustomSoftware && input.Budget == 0 && len(input.NeedSummary) < 30 {
-		return domain.Lead{}, httpx.Validation("Discovery custom software belum cukup", "Jika budget belum diketahui, isi ringkasan kebutuhan minimal 30 karakter.")
+		return domain.Lead{}, httpx.Validation("Budget tidak valid", "Budget tidak boleh bernilai negatif")
 	}
 
-	status, score, note := qualifyLead(input)
+	rule, err := s.store.GetServiceRule(ctx, input.ServiceType)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return domain.Lead{}, httpx.Validation("Tipe layanan tidak valid", "")
+		}
+		return domain.Lead{}, err
+	}
+	if !rule.IsActive {
+		return domain.Lead{}, httpx.Validation("Layanan belum aktif", "Pilih layanan lain yang tersedia di katalog")
+	}
+	if rule.RequiresDiscovery && input.Budget == 0 && len(input.NeedSummary) < 30 {
+		return domain.Lead{}, httpx.Validation("Discovery layanan belum cukup", "Jika budget belum diketahui, isi ringkasan kebutuhan minimal 30 karakter")
+	}
+
+	status, score, note := qualifyLead(input, rule)
 	return s.store.CreateLead(ctx, store.CreateLeadInput{
 		PartnerID:          partnerID,
 		CompanyName:        input.CompanyName,
@@ -87,72 +96,24 @@ func (s *LeadService) UpdateLeadStatus(ctx context.Context, leadID string, actor
 	return lead, nil
 }
 
-func serviceRules() []domain.ServiceRule {
-	return []domain.ServiceRule{
-		{
-			Type:              domain.ServiceCompanyProfile,
-			Label:             "Company Profile",
-			Description:       "Profil bisnis, landing page kredibilitas, showcase layanan, dan funnel kontak.",
-			MinimumBudget:     10_000_000,
-			RequiresDiscovery: false,
-		},
-		{
-			Type:              domain.ServiceWebsiteApp,
-			Label:             "Website atau Aplikasi Sederhana",
-			Description:       "Portal ringan, katalog, booking, dashboard dasar, atau integrasi standar.",
-			MinimumBudget:     15_000_000,
-			RequiresDiscovery: false,
-		},
-		{
-			Type:              domain.ServiceCustomSoftware,
-			Label:             "Custom Software / ERP",
-			Description:       "Sistem kompleks dengan discovery proses bisnis, modul, integrasi, dan risiko delivery.",
-			MinimumBudget:     25_000_000,
-			RequiresDiscovery: true,
-		},
-		{
-			Type:              domain.ServiceSalesView,
-			Label:             "SalesView",
-			Description:       "Produk pipeline dan tracking aktivitas sales dengan referral code mitra.",
-			MinimumBudget:     0,
-			RequiresDiscovery: false,
-		},
-	}
-}
-
-func qualifyLead(input LeadInput) (domain.LeadStatus, int, string) {
-	rules := map[domain.ServiceType]domain.ServiceRule{}
-	for _, rule := range serviceRules() {
-		rules[rule.Type] = rule
-	}
-
-	rule := rules[input.ServiceType]
-	if input.ServiceType == domain.ServiceCustomSoftware && input.Budget == 0 {
-		return domain.LeadStatusSubmitted, 72, "Budget belum diketahui, tetapi kebutuhan cukup untuk discovery awal."
+func qualifyLead(input LeadInput, rule domain.ServiceRule) (domain.LeadStatus, int, string) {
+	if rule.RequiresDiscovery && input.Budget == 0 {
+		return domain.LeadStatusSubmitted, 72, "Budget belum diketahui, tetapi kebutuhan cukup untuk discovery awal"
 	}
 
 	if rule.MinimumBudget > 0 && input.Budget < rule.MinimumBudget {
-		return domain.LeadStatusRejected, 32, "Budget di bawah kriteria minimum untuk layanan ini."
+		return domain.LeadStatusRejected, 32, "Budget di bawah kriteria minimum untuk layanan ini"
 	}
 
-	if input.ServiceType == domain.ServiceCustomSoftware && len(input.NeedSummary) >= 30 {
-		return domain.LeadStatusQualified, 90, "Lead kompleks memenuhi kriteria discovery dan estimasi budget."
+	if rule.RequiresDiscovery && len(input.NeedSummary) >= 30 {
+		return domain.LeadStatusQualified, 90, "Lead kompleks memenuhi kriteria discovery dan estimasi budget"
 	}
 
 	if input.ServiceType == domain.ServiceSalesView {
-		return domain.LeadStatusQualified, 78, "Lead produk siap ditindaklanjuti memakai referral code."
+		return domain.LeadStatusQualified, 78, "Lead produk siap ditindaklanjuti memakai referral code"
 	}
 
-	return domain.LeadStatusQualified, 84, "Lead memenuhi kriteria budget minimum."
-}
-
-func isKnownService(serviceType domain.ServiceType) bool {
-	for _, rule := range serviceRules() {
-		if rule.Type == serviceType {
-			return true
-		}
-	}
-	return false
+	return domain.LeadStatusQualified, 84, "Lead memenuhi kriteria budget minimum"
 }
 
 func isKnownStatus(status domain.LeadStatus) bool {

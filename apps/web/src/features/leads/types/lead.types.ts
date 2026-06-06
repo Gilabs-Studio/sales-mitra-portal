@@ -1,14 +1,6 @@
-export type ServiceType = "company_profile" | "website_app" | "custom_software" | "salesview";
+export type ServiceType = "company_profile" | "website_app" | "custom_software" | "salesview" | "other" | (string & {});
 
 export type LeadStatus = "submitted" | "qualified" | "contacted" | "won" | "lost" | "rejected";
-
-export type ServiceRule = {
-  type: ServiceType;
-  label: string;
-  description: string;
-  minimumBudget: number;
-  requiresDiscovery: boolean;
-};
 
 export type Lead = {
   id: string;

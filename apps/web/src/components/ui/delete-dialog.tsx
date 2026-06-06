@@ -19,7 +19,7 @@ export function DeleteDialog({ open, itemName, onOpenChange, onConfirm }: Delete
       <div className="w-full max-w-sm rounded-lg border border-border bg-card p-5 shadow-xl">
         <h2 className="text-lg font-extrabold text-foreground">Hapus {itemName}?</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Aksi ini perlu dikonfirmasi sebelum data dihapus.
+          Aksi ini perlu dikonfirmasi sebelum data dihapus
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>

@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "GiLabs Mitra Portal",
-  description: "Partner portal untuk referral, lead qualification, dan knowledge center GiLabs.",
+  description: "Partner portal untuk referral, lead qualification, dan knowledge center GiLabs",
 };
 
 export default function RootLayout({

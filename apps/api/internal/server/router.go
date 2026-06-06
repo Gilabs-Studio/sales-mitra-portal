@@ -23,6 +23,7 @@ type Handler struct {
 	authService      *service.AuthService
 	leadService      *service.LeadService
 	knowledgeService *service.KnowledgeService
+	catalogService   *service.ServiceCatalogService
 }
 
 func NewRouter(
@@ -31,12 +32,15 @@ func NewRouter(
 	authService *service.AuthService,
 	leadService *service.LeadService,
 	knowledgeService *service.KnowledgeService,
+	catalogService *service.ServiceCatalogService,
 ) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.New()
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
+	router.Use(securityHeaders())
+	router.Use(limitRequestBody(1 << 20))
 
 	allowedOrigins := append([]string{}, cfg.WebOrigins...)
 	router.Use(cors.New(cors.Config{
@@ -44,7 +48,7 @@ func NewRouter(
 		AllowOriginWithContextFunc: func(c *gin.Context, origin string) bool {
 			return isAllowedOrigin(origin, allowedOrigins)
 		},
-		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodOptions},
+		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete, http.MethodOptions},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
@@ -56,6 +60,7 @@ func NewRouter(
 		authService:      authService,
 		leadService:      leadService,
 		knowledgeService: knowledgeService,
+		catalogService:   catalogService,
 	}
 
 	api := router.Group("/api/v1")
@@ -83,8 +88,29 @@ func NewRouter(
 	admin.GET("/leads", handler.adminLeads)
 	admin.PATCH("/leads/:id/status", handler.updateLeadStatus)
 	admin.GET("/partners", handler.adminPartners)
+	admin.GET("/services", handler.adminServices)
+	admin.POST("/services", handler.upsertService)
+	admin.PATCH("/services/:type", handler.updateService)
+	admin.DELETE("/services/:type", handler.deleteService)
 
 	return router
+}
+
+func securityHeaders() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Next()
+	}
+}
+
+func limitRequestBody(maxBytes int64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBytes)
+		c.Next()
+	}
 }
 
 func isAllowedOrigin(origin string, allowedOrigins []string) bool {
@@ -154,7 +180,12 @@ func (h Handler) me(c *gin.Context) {
 }
 
 func (h Handler) serviceCatalog(c *gin.Context) {
-	httpx.OK(c, "Katalog layanan", h.leadService.ServiceRules())
+	services, err := h.catalogService.List(c.Request.Context(), false)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Katalog layanan", services)
 }
 
 func (h Handler) knowledge(c *gin.Context) {
@@ -265,6 +296,54 @@ func (h Handler) adminPartners(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, "Daftar mitra", partners)
+}
+
+func (h Handler) adminServices(c *gin.Context) {
+	services, err := h.catalogService.List(c.Request.Context(), true)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Daftar layanan", services)
+}
+
+func (h Handler) upsertService(c *gin.Context) {
+	var input service.ServiceRuleInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload layanan tidak valid", err.Error()))
+		return
+	}
+
+	result, err := h.catalogService.Upsert(c.Request.Context(), input)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Layanan disimpan", result)
+}
+
+func (h Handler) updateService(c *gin.Context) {
+	var input service.ServiceRuleInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload layanan tidak valid", err.Error()))
+		return
+	}
+	input.Type = domain.ServiceType(c.Param("type"))
+
+	result, err := h.catalogService.Upsert(c.Request.Context(), input)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Layanan diperbarui", result)
+}
+
+func (h Handler) deleteService(c *gin.Context) {
+	if err := h.catalogService.Delete(c.Request.Context(), domain.ServiceType(c.Param("type"))); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.NoContent(c, "Layanan dihapus")
 }
 
 func (h Handler) requireAuth() gin.HandlerFunc {

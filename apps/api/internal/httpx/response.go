@@ -81,7 +81,6 @@ func Fail(c *gin.Context, err error) {
 		Error: &APIError{
 			Code:    "INTERNAL_ERROR",
 			Message: "Terjadi kesalahan pada server",
-			Details: err.Error(),
 		},
 	})
 }

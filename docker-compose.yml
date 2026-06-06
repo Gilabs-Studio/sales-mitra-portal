@@ -3,19 +3,14 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    env_file:
+      - apps/api/.env
     environment:
       PORT: "8080"
       DATABASE_URL: file:/app/data/mitra-sales.db?cache=shared
       JWT_SECRET: replace-with-a-long-random-secret
       JWT_EXPIRES_IN: 24h
       WEB_ORIGIN: http://localhost:3000,http://localhost:8089,http://127.0.0.1:3000,http://127.0.0.1:8089
-      ADMIN_NAME: GiLabs Admin
-      ADMIN_EMAIL: admin@gilabs.local
-      ADMIN_PASSWORD: admin12345
-      DEMO_PARTNER_NAME: Mitra Demo
-      DEMO_PARTNER_EMAIL: mitra@gilabs.local
-      DEMO_PARTNER_PASSWORD: mitra12345
-      REFERRAL_CODE_SEED: GILABS
     volumes:
       - api_data:/app/data
     restart: unless-stopped

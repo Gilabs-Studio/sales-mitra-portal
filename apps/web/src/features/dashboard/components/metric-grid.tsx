@@ -19,7 +19,7 @@ export function BreakdownGrid({ title, items }: { title: string; items: Breakdow
       <h2 className="text-lg font-extrabold text-foreground">{title}</h2>
       <div className="mt-4 space-y-3">
         {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Belum ada data.</p>
+          <p className="text-sm text-muted-foreground">Belum ada data</p>
         ) : (
           items.map((item) => (
             <div key={item.key}>

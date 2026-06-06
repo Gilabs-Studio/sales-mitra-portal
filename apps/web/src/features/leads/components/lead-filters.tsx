@@ -1,11 +1,13 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
-import { useLeadFilters, serviceOptions, statusOptions } from "../hooks/use-leads";
-import { serviceLabels, statusLabels } from "../utils/lead-labels";
+import { useServiceCatalog } from "@/features/services/hooks/use-services";
+import { useLeadFilters, statusOptions } from "../hooks/use-leads";
+import { serviceLabel, statusLabels } from "../utils/lead-labels";
 
 export function LeadFilters() {
   const { status, serviceType, setStatus, setServiceType } = useLeadFilters();
+  const services = useServiceCatalog();
 
   return (
     <div className="grid gap-3 md:grid-cols-2">
@@ -17,9 +19,10 @@ export function LeadFilters() {
         ))}
       </Select>
       <Select value={serviceType} onChange={(event) => setServiceType(event.target.value as typeof serviceType)}>
-        {serviceOptions.map((item) => (
-          <option key={item || "all"} value={item}>
-            {item ? serviceLabels[item] : "Semua layanan"}
+        <option value="">Semua layanan</option>
+        {(services.data ?? []).map((item) => (
+          <option key={item.type} value={item.type}>
+            {serviceLabel(item.type)}
           </option>
         ))}
       </Select>
