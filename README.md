@@ -4,6 +4,7 @@ Monorepo partner portal dengan:
 
 - `apps/web`: Next.js App Router, React Query, Zustand, Zod, React Hook Form, Tailwind CSS v4.
 - `apps/api`: Go Gin API, JWT auth, SQLite local storage, standardized response/error handling.
+- `apps/mobile`: Flutter mobile app dengan inbox lead partner/admin, chat WhatsApp-like, add lead, detail lead, dan knowledge center.
 
 ## Menjalankan Lokal
 
@@ -36,6 +37,15 @@ pnpm dev
 cd apps/web
 pnpm dev
 ```
+
+Mobile Flutter:
+
+```bash
+cd apps/mobile
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8089/api/v1
+```
+
+Gunakan `10.0.2.2` untuk Android emulator. Untuk device fisik, ganti `API_BASE_URL` ke alamat LAN mesin yang menjalankan API/proxy lokal.
 
 ## API Response
 
