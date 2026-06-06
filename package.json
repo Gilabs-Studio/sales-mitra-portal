@@ -2,15 +2,16 @@
   "name": "mitra-sales-portal",
   "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "apps/web"
-  ],
+  "packageManager": "pnpm@11.1.3",
   "scripts": {
-    "dev:web": "npm --workspace apps/web run dev",
-    "build:web": "npm --workspace apps/web run build",
-    "lint:web": "npm --workspace apps/web run lint",
-    "dev:api": "cd apps/api && go run ./cmd/server",
-    "test:api": "cd apps/api && go test ./...",
-    "format:api": "cd apps/api && gofmt -w ./cmd ./internal"
+    "dev": "sh -c 'pnpm --dir apps/api dev & pnpm --dir apps/web dev & wait'",
+    "dev:web": "pnpm --dir apps/web dev",
+    "build:web": "pnpm --dir apps/web build",
+    "lint:web": "pnpm --dir apps/web lint",
+    "dev:api": "pnpm --dir apps/api dev",
+    "test:api": "pnpm --dir apps/api test",
+    "format:api": "cd apps/api && gofmt -w ./cmd ./internal",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down"
   }
 }

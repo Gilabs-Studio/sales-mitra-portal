@@ -1,6 +1,7 @@
 # dependencies
 node_modules/
 apps/web/node_modules/
+.pnpm-store/
 
 # next
 .next/

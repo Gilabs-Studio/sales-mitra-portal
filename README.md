@@ -10,9 +10,8 @@ Monorepo partner portal dengan:
 ```bash
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.local.example apps/web/.env.local
-npm install
-npm run dev:api
-npm run dev:web
+pnpm install
+pnpm dev
 ```
 
 Demo credential:
@@ -25,6 +24,18 @@ Jika binary `go` dari Snap bermasalah, jalankan API dengan path langsung:
 ```bash
 cd apps/api
 /snap/go/current/bin/go run ./cmd/server
+```
+
+Atau untuk workflow normal per package:
+
+```bash
+cd apps/api
+pnpm dev
+```
+
+```bash
+cd apps/web
+pnpm dev
 ```
 
 ## API Response
@@ -54,3 +65,19 @@ Error:
 ```
 
 Dashboard dan list admin memakai query agregat/JOIN, bukan loop request per lead atau per mitra.
+
+## Menjalankan Dengan Docker
+
+Semua akses browser masuk lewat `http://localhost:8089`.
+
+```bash
+docker compose up --build
+```
+
+Arsitektur container:
+
+- `web`: Next.js, exposed ke host pada port `8089`
+- `api`: Gin API, hanya dipakai internal network Compose
+- `api_data`: volume untuk persist SQLite
+
+Web memanggil API lewat path relatif `/api/v1`, lalu Next me-rewrite request itu ke service `api` di dalam Docker network.

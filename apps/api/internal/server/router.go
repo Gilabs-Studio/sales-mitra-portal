@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -36,10 +37,15 @@ func NewRouter(
 	router := gin.New()
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
+
+	allowedOrigins := append([]string{}, cfg.WebOrigins...)
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{cfg.WebOrigin},
+		AllowOrigins: []string{},
+		AllowOriginWithContextFunc: func(c *gin.Context, origin string) bool {
+			return isAllowedOrigin(origin, allowedOrigins)
+		},
 		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodOptions},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
@@ -79,6 +85,31 @@ func NewRouter(
 	admin.GET("/partners", handler.adminPartners)
 
 	return router
+}
+
+func isAllowedOrigin(origin string, allowedOrigins []string) bool {
+	if origin == "" {
+		return false
+	}
+
+	for _, allowedOrigin := range allowedOrigins {
+		if origin == allowedOrigin {
+			return true
+		}
+	}
+
+	parsedOrigin, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+
+	host := strings.ToLower(parsedOrigin.Hostname())
+	switch host {
+	case "localhost", "127.0.0.1":
+		return true
+	default:
+		return false
+	}
 }
 
 func (h Handler) health(c *gin.Context) {

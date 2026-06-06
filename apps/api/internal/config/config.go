@@ -14,6 +14,7 @@ type Config struct {
 	JWTSecret        string
 	JWTExpiresIn     time.Duration
 	WebOrigin        string
+	WebOrigins       []string
 	AdminName        string
 	AdminEmail       string
 	AdminPassword    string
@@ -26,12 +27,15 @@ type Config struct {
 func Load() Config {
 	_ = godotenv.Load()
 
+	webOrigin := env("WEB_ORIGIN", "http://localhost:3000")
+
 	return Config{
 		Port:             env("PORT", "8080"),
 		DatabaseURL:      env("DATABASE_URL", "file:data/mitra-sales.db?cache=shared"),
 		JWTSecret:        env("JWT_SECRET", "change-me-in-production"),
 		JWTExpiresIn:     durationEnv("JWT_EXPIRES_IN", 24*time.Hour),
-		WebOrigin:        env("WEB_ORIGIN", "http://localhost:3000"),
+		WebOrigin:        webOrigin,
+		WebOrigins:       originsEnv("WEB_ORIGIN", webOrigin),
 		AdminName:        env("ADMIN_NAME", "GiLabs Admin"),
 		AdminEmail:       strings.ToLower(env("ADMIN_EMAIL", "admin@gilabs.local")),
 		AdminPassword:    env("ADMIN_PASSWORD", "admin12345"),
@@ -40,6 +44,22 @@ func Load() Config {
 		DemoPartnerPass:  env("DEMO_PARTNER_PASSWORD", "mitra12345"),
 		ReferralCodeSeed: env("REFERRAL_CODE_SEED", "GILABS"),
 	}
+}
+
+func originsEnv(key string, fallback string) []string {
+	raw := env(key, fallback)
+	parts := strings.Split(raw, ",")
+	origins := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		origin := strings.TrimSpace(part)
+		if origin == "" {
+			continue
+		}
+		origins = append(origins, origin)
+	}
+
+	return origins
 }
 
 func env(key string, fallback string) string {
