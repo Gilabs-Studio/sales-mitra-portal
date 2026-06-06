@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { LogOut } from "lucide-react";
 import { Link, usePathname } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
@@ -61,8 +62,15 @@ export function AppShell({ user, children, noPadding }: AppShellProps) {
       <header className="sticky top-0 z-50 shrink-0 bg-background py-4">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between px-6">
           {/* Logo / Branding */}
-          <Link href="/" className="font-extrabold tracking-tight text-foreground cursor-pointer text-base uppercase hover:opacity-90 transition-opacity">
-            GiLabs Portal
+          <Link href="/" className="cursor-pointer inline-flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <Image
+              src="/Logo.png"
+              alt="GiLabs"
+              width={88}
+              height={28}
+              className="h-6 w-auto object-contain"
+              priority
+            />
           </Link>
 
           {/* Navigation Menu & Profile */}
@@ -93,7 +101,7 @@ export function AppShell({ user, children, noPadding }: AppShellProps) {
               })}
             </nav>
 
-            <div className="h-4 w-[1px] bg-border/40" />
+            <div className="h-4 w-px bg-border/40" />
 
             {/* Profile Dropdown Trigger */}
             <div className="relative flex items-center" ref={dropdownRef}>

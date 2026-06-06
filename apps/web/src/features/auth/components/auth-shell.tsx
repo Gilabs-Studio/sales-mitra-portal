@@ -1,4 +1,5 @@
 import { Link } from "@/i18n/routing";
+import Image from "next/image";
 
 type AuthShellProps = {
   title: string;
@@ -11,8 +12,15 @@ export function AuthShell({ title, description, children }: AuthShellProps) {
     <main className="min-h-screen bg-background px-6 py-8">
       <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-8 lg:grid-cols-[1fr_420px]">
         <section className="flex flex-col justify-between border-b border-border pb-8 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-10">
-          <Link href="/" className="text-sm font-extrabold text-foreground">
-            GiLabs Mitra Portal
+          <Link href="/" className="select-none cursor-pointer inline-flex items-center">
+            <Image
+              src="/Logo.png"
+              alt="GiLabs"
+              width={96}
+              height={32}
+              className="h-7 w-auto object-contain"
+              priority
+            />
           </Link>
           <div className="max-w-2xl py-12">
             <p className="text-sm font-semibold uppercase text-muted-foreground">Partner ecosystem</p>
