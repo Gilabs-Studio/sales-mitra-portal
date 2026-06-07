@@ -1,23 +1,20 @@
 "use client";
 
-import * as React from "react";
-import { Bot, Send } from "lucide-react";
+import { Bot, ChevronRight, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Link } from "@/i18n/routing";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
 import { AppShell } from "@/features/dashboard/components/app-shell";
-import { cn } from "@/lib/utils";
-import { getKnowledgeDetail } from "../knowledge-details";
-import type { KnowledgeArticle } from "../types/knowledge.types";
 import { useChatbot, useKnowledge } from "../hooks/use-knowledge";
+import { cn } from "@/lib/utils";
 
 export function KnowledgeScreen() {
   const auth = useAuthGuard("partner");
   const knowledge = useKnowledge();
   const chatbot = useChatbot();
   const { register } = chatbot.form;
-  const [activeArticle, setActiveArticle] = React.useState<KnowledgeArticle | null>(null);
 
   if (auth.isLoading || !auth.isAllowed || !auth.user) {
     return <div className="min-h-screen bg-background" />;
@@ -35,21 +32,19 @@ export function KnowledgeScreen() {
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             {knowledge.data?.map((article) => (
-              <button
+              <Link
                 key={article.id}
-                type="button"
-                onClick={() => setActiveArticle(article)}
+                href={`/partner/knowledge/${article.id}`}
                 className="rounded-lg border border-border bg-card p-5 text-left transition-colors hover:bg-secondary/25"
               >
                 <p className="text-xs font-semibold uppercase text-muted-foreground">{article.category}</p>
                 <h2 className="mt-2 text-xl font-extrabold text-foreground">{article.title}</h2>
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">{article.content}</p>
-                {getKnowledgeDetail(article) ? (
-                  <p className="mt-4 text-xs font-bold uppercase tracking-wide text-foreground">
-                    Buka detail
-                  </p>
-                ) : null}
-              </button>
+                <p className="mt-4 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-foreground">
+                  Buka detail
+                  <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </p>
+              </Link>
             ))}
           </div>
         </section>
@@ -82,84 +77,6 @@ export function KnowledgeScreen() {
           </form>
         </aside>
       </div>
-      {activeArticle ? (
-        <KnowledgeDetailDialog
-          article={activeArticle}
-          onClose={() => setActiveArticle(null)}
-        />
-      ) : null}
     </AppShell>
-  );
-}
-
-function KnowledgeDetailDialog({
-  article,
-  onClose,
-}: {
-  article: KnowledgeArticle;
-  onClose: () => void;
-}) {
-  const detail = getKnowledgeDetail(article);
-
-  return (
-    <>
-      <button
-        type="button"
-        aria-label="Tutup detail knowledge"
-        onClick={onClose}
-        className="fixed inset-0 z-40 bg-black/45"
-      />
-      <div className="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85vh] w-full max-w-4xl overflow-hidden rounded-t-xl border border-border bg-card shadow-2xl">
-        <div className="flex items-start justify-between border-b border-border px-5 py-4">
-          <div>
-            <p className="text-xs font-semibold uppercase text-muted-foreground">{article.category}</p>
-            <h3 className="mt-1 text-2xl font-extrabold text-foreground">{article.title}</h3>
-          </div>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Tutup
-          </Button>
-        </div>
-        <div className="max-h-[calc(85vh-84px)] overflow-y-auto px-5 py-5">
-          <p className="text-sm leading-7 text-muted-foreground">
-            {detail?.overview ?? article.content}
-          </p>
-          {detail?.sections.map((section) => (
-            <section key={section.title} className="mt-6 space-y-3">
-              <div>
-                <h4 className="text-lg font-extrabold text-foreground">{section.title}</h4>
-                {section.summary ? (
-                  <p className="mt-1 text-sm text-muted-foreground">{section.summary}</p>
-                ) : null}
-              </div>
-              <div className="space-y-3">
-                {section.items.map((item) => (
-                  <details
-                    key={item.title}
-                    className="rounded-lg border border-border bg-background px-4 py-3"
-                  >
-                    <summary className="cursor-pointer list-none text-sm font-bold text-foreground">
-                      {item.title}
-                    </summary>
-                    {item.summary ? (
-                      <p className="mt-3 text-sm leading-6 text-muted-foreground">{item.summary}</p>
-                    ) : null}
-                    {item.bullets?.length ? (
-                      <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
-                        {item.bullets.map((bullet) => (
-                          <li key={bullet} className="flex gap-2">
-                            <span className="mt-[7px] h-1.5 w-1.5 rounded-full bg-foreground/70" />
-                            <span>{bullet}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </details>
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
-      </div>
-    </>
   );
 }
