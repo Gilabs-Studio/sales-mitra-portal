@@ -74,6 +74,8 @@ ThemeData buildMitraTheme() {
       selectedItemColor: MitraColors.foreground,
       unselectedItemColor: MitraColors.mutedForeground,
       selectedLabelStyle: TextStyle(fontWeight: FontWeight.w800),
+      selectedIconTheme: IconThemeData(size: 22),
+      unselectedIconTheme: IconThemeData(size: 21),
       type: BottomNavigationBarType.fixed,
     ),
   );

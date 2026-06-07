@@ -5,7 +5,6 @@ import '../models.dart';
 import '../theme.dart';
 import '../utils.dart';
 import '../widgets/status_badge.dart';
-import 'add_lead_sheet.dart';
 import 'chat_screen.dart';
 
 class ChatListScreen extends StatelessWidget {
@@ -19,12 +18,6 @@ class ChatListScreen extends StatelessWidget {
       builder: (context, _) {
         final user = state.user;
         return Scaffold(
-          floatingActionButton: state.role == UserRole.partner
-              ? FloatingActionButton(
-                  onPressed: () => showAddLeadSheet(context),
-                  child: const Icon(Icons.add),
-                )
-              : null,
           body: SafeArea(
             child: RefreshIndicator(
               onRefresh: state.refreshLeads,
@@ -282,11 +275,38 @@ class _FilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        selected: selected,
-        label: Text(label),
-        onSelected: (_) => onTap(),
-        showCheckmark: false,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected
+                  ? MitraColors.success.withValues(alpha: 0.18)
+                  : MitraColors.card,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: selected
+                    ? MitraColors.success.withValues(alpha: 0.55)
+                    : MitraColors.border.withValues(alpha: 0.75),
+                width: 0.9,
+              ),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected
+                    ? MitraColors.foreground
+                    : MitraColors.mutedForeground,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

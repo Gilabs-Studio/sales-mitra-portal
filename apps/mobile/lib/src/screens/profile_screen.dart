@@ -79,7 +79,6 @@ class ProfileScreen extends StatelessWidget {
                       label: 'Kode partner',
                       value: user!.partnerCode,
                     ),
-                  _ProfileLine(label: 'API', value: state.api.baseUrl),
                 ],
               ),
             ),

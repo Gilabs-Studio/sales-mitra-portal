@@ -14,10 +14,19 @@ Fitur utama:
 ## Menjalankan
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8089/api/v1
+cp .env.example .env
+flutter run --dart-define-from-file=.env
 ```
 
-Default `API_BASE_URL` sudah memakai `http://10.0.2.2:8089/api/v1`, cocok untuk Android emulator saat Docker/web proxy berjalan di host. Untuk iOS simulator atau device fisik, isi URL sesuai host yang bisa dijangkau device.
+Contoh `.env.example`:
+
+```json
+{
+  "API_BASE_URL": "http://localhost:8089/api/v1"
+}
+```
+
+Gunakan `10.0.2.2` untuk Android emulator, `localhost` untuk desktop runner atau simulator lokal, dan alamat LAN host untuk device fisik.
 
 ## Validasi
 

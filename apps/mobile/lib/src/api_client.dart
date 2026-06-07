@@ -155,7 +155,7 @@ class ApiClient {
       );
     }
     if (body != null) {
-      request.write(jsonEncode(body));
+      request.add(utf8.encode(jsonEncode(body)));
     }
 
     final response = await request.close();

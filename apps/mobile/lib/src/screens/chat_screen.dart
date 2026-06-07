@@ -23,6 +23,7 @@ class _ChatScreenState extends State<ChatScreen> {
   List<LeadEvent> events = [];
   bool loading = true;
   bool sending = false;
+  bool scheduling = false;
 
   @override
   void initState() {
@@ -91,11 +92,6 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
         actions: [
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.videocam_outlined),
-          ),
-          IconButton(onPressed: () {}, icon: const Icon(Icons.call_outlined)),
-          IconButton(
             onPressed: activeLead == null
                 ? null
                 : () => showLeadDetailSheet(
@@ -134,6 +130,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 ChatInputBar(
                   controller: textController,
                   sending: sending,
+                  scheduling: scheduling,
+                  onSchedule: _scheduleMeeting,
                   onSend: _send,
                 ),
               ],
@@ -186,6 +184,56 @@ class _ChatScreenState extends State<ChatScreen> {
       ).showSnackBar(SnackBar(content: Text(error.toString())));
     } finally {
       if (mounted) setState(() => sending = false);
+    }
+  }
+
+  Future<void> _scheduleMeeting() async {
+    if (scheduling || lead == null) return;
+
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'Jadwalkan meeting',
+    );
+    if (date == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      helpText: 'Pilih jam meeting',
+    );
+    if (time == null || !mounted) return;
+
+    final timestamp = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+    final message =
+        '📅 Jadwal meeting diatur: ${weekdayLabel(timestamp)}, ${fullDateWithoutTime(timestamp)} pukul ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+
+    final state = StateScope.of(context);
+    setState(() => scheduling = true);
+    try {
+      final sent = await state.api.sendMessage(
+        state.role,
+        widget.leadId,
+        message,
+      );
+      setState(() => messages = [...messages, sent]);
+      await state.refreshLead(widget.leadId);
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => scheduling = false);
     }
   }
 
@@ -284,7 +332,11 @@ class MessageBubble extends StatelessWidget {
             Text(
               message.message,
               style: TextStyle(
-                color: self ? MitraColors.background : MitraColors.foreground,
+                color: meeting
+                    ? MitraColors.foreground
+                    : self
+                    ? MitraColors.background
+                    : MitraColors.foreground,
                 fontSize: 15,
                 height: 1.35,
               ),
@@ -313,12 +365,16 @@ class ChatInputBar extends StatelessWidget {
   const ChatInputBar({
     required this.controller,
     required this.sending,
+    required this.scheduling,
+    required this.onSchedule,
     required this.onSend,
     super.key,
   });
 
   final TextEditingController controller;
   final bool sending;
+  final bool scheduling;
+  final VoidCallback onSchedule;
   final VoidCallback onSend;
 
   @override
@@ -326,54 +382,68 @@ class ChatInputBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
         color: MitraColors.muted,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            Container(
+              width: 42,
+              height: 42,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: MitraColors.border.withValues(alpha: 0.85),
+                  width: 0.8,
+                ),
+              ),
+              child: IconButton(
+                onPressed: scheduling ? null : onSchedule,
+                tooltip: 'Jadwalkan meeting',
+                icon: scheduling
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.calendar_month_outlined, size: 20),
+              ),
+            ),
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(26),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: MitraColors.border.withValues(alpha: 0.85),
+                    width: 0.8,
+                  ),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.emoji_emotions_outlined),
+                child: TextField(
+                  controller: controller,
+                  minLines: 1,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: 'Ketik pesan',
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 11,
                     ),
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        minLines: 1,
-                        maxLines: 4,
-                        decoration: const InputDecoration(
-                          hintText: 'Ketik pesan',
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          fillColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.attach_file),
-                    ),
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.photo_camera_outlined),
-                    ),
-                  ],
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    fillColor: Colors.white,
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 8),
             FloatingActionButton.small(
+              heroTag: 'chat-send-fab',
               elevation: 0,
-              onPressed: sending ? null : onSend,
+              onPressed: sending || scheduling ? null : onSend,
               child: sending
                   ? const SizedBox(
                       width: 16,

@@ -5,7 +5,7 @@ import 'models.dart';
 
 const defaultApiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://10.0.2.2:8089/api/v1',
+  defaultValue: 'http://localhost:8089/api/v1',
 );
 
 class AppState extends ChangeNotifier {

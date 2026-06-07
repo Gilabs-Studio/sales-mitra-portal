@@ -12,14 +12,12 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final apiController = TextEditingController(text: defaultApiBaseUrl);
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool showPassword = false;
 
   @override
   void dispose() {
-    apiController.dispose();
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
@@ -36,9 +34,31 @@ class _LoginScreenState extends State<LoginScreen> {
             return ListView(
               padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
               children: [
-                const Text(
-                  'GiLabs',
-                  style: TextStyle(fontSize: 38, fontWeight: FontWeight.w900),
+                Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: MitraColors.card,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: MitraColors.border),
+                      ),
+                      child: Image.asset(
+                        'assets/images/logo-putih-1.jpg',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Text(
+                      'GiLabs',
+                      style: TextStyle(
+                        fontSize: 38,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 6),
                 const Text(
@@ -50,15 +70,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                TextField(
-                  controller: apiController,
-                  keyboardType: TextInputType.url,
-                  decoration: const InputDecoration(
-                    labelText: 'API base URL',
-                    prefixIcon: Icon(Icons.link),
-                  ),
-                ),
-                const SizedBox(height: 12),
                 TextField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -109,22 +120,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       : const Icon(Icons.login),
                   label: const Text('Masuk'),
                 ),
-                const SizedBox(height: 18),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: MitraColors.muted,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: MitraColors.border),
-                  ),
-                  child: const Text(
-                    'Untuk Android emulator, default URL memakai 10.0.2.2:8089/api/v1 agar masuk ke Docker/web proxy lokal.',
-                    style: TextStyle(
-                      color: MitraColors.mutedForeground,
-                      height: 1.35,
-                    ),
-                  ),
-                ),
               ],
             );
           },
@@ -136,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login(AppState state) async {
     try {
       await state.login(
-        baseUrl: apiController.text,
+        baseUrl: '',
         email: emailController.text,
         password: passwordController.text,
       );

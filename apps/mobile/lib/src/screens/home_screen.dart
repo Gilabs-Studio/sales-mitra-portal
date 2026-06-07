@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../theme.dart';
+import 'add_lead_sheet.dart';
 import 'chat_list_screen.dart';
 import 'knowledge_screen.dart';
 import 'profile_screen.dart';
@@ -31,14 +32,44 @@ class _HomeScreenState extends State<HomeScreen> {
               ProfileScreen(),
             ],
           ),
+          floatingActionButton: index == 0
+              ? FloatingActionButton.small(
+                  heroTag: 'home-add-lead-fab',
+                  elevation: 1,
+                  onPressed: () {
+                    if (state.role.name == 'partner') {
+                      showAddLeadSheet(context);
+                      return;
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Tambah lead tersedia dari akun partner.',
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Icon(Icons.add),
+                )
+              : null,
           bottomNavigationBar: Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: MitraColors.card,
-              border: Border(top: BorderSide(color: MitraColors.border)),
+              border: Border(
+                top: BorderSide(
+                  color: MitraColors.border.withValues(alpha: 0.42),
+                  width: 0.45,
+                ),
+              ),
             ),
             child: BottomNavigationBar(
               currentIndex: index,
               onTap: (value) => setState(() => index = value),
+              elevation: 0,
+              iconSize: 22,
+              selectedFontSize: 11,
+              unselectedFontSize: 11,
+              type: BottomNavigationBarType.fixed,
               items: [
                 BottomNavigationBarItem(
                   icon: Stack(
