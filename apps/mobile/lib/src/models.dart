@@ -9,6 +9,8 @@ class User {
     required this.email,
     required this.role,
     required this.partnerCode,
+    required this.isSuspended,
+    required this.suspendedReason,
   });
 
   final String id;
@@ -16,6 +18,8 @@ class User {
   final String email;
   final UserRole role;
   final String partnerCode;
+  final bool isSuspended;
+  final String suspendedReason;
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
@@ -24,6 +28,8 @@ class User {
       email: json['email'] as String? ?? '',
       role: parseRole(json['role'] as String? ?? 'partner'),
       partnerCode: json['partnerCode'] as String? ?? '',
+      isSuspended: json['isSuspended'] as bool? ?? false,
+      suspendedReason: json['suspendedReason'] as String? ?? '',
     );
   }
 }
@@ -86,6 +92,7 @@ class Lead {
     this.partnerName = '',
     this.partnerEmail = '',
     this.partnerCode = '',
+    this.partnerSuspended = false,
   });
 
   final String id;
@@ -107,6 +114,7 @@ class Lead {
   final String partnerName;
   final String partnerEmail;
   final String partnerCode;
+  final bool partnerSuspended;
 
   factory Lead.fromJson(Map<String, dynamic> json) {
     return Lead(
@@ -131,6 +139,7 @@ class Lead {
       partnerName: json['partnerName'] as String? ?? '',
       partnerEmail: json['partnerEmail'] as String? ?? '',
       partnerCode: json['partnerCode'] as String? ?? '',
+      partnerSuspended: json['partnerSuspended'] as bool? ?? false,
     );
   }
 }

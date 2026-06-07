@@ -25,8 +25,8 @@ func main() {
 		log.Fatalf("migrate database: %v", err)
 	}
 
-	authService := service.NewAuthService(repository, cfg)
 	notificationService := service.NewNotificationService(cfg)
+	authService := service.NewAuthService(repository, cfg, notificationService)
 	leadService := service.NewLeadService(repository, cfg, notificationService)
 	knowledgeService := service.NewKnowledgeService(repository)
 	serviceCatalogService := service.NewServiceCatalogService(repository)

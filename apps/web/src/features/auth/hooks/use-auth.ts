@@ -5,8 +5,27 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocale } from "next-intl";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { loginSchema, registerSchema, type LoginFormValues, type RegisterFormValues } from "../schemas/auth.schema";
-import { getMe, login, registerPartner } from "../services/auth.service";
+import {
+  changePasswordSchema,
+  loginSchema,
+  passwordResetConfirmSchema,
+  passwordResetRequestSchema,
+  registerSchema,
+  type LoginFormValues,
+  type ChangePasswordFormValues,
+  type PasswordResetConfirmFormValues,
+  type PasswordResetRequestFormValues,
+  type RegisterFormValues,
+} from "../schemas/auth.schema";
+import {
+  confirmPasswordReset,
+  changePassword,
+  getMe,
+  login,
+  registerPartner,
+  requestCurrentUserPasswordReset,
+  requestPasswordReset,
+} from "../services/auth.service";
 import { isAdminRole, rolePath, type Role } from "../types/auth.types";
 import { clearAccessToken, getAccessToken, setAccessToken } from "../utils/auth-storage";
 import { useRouter } from "@/i18n/routing";
@@ -106,5 +125,71 @@ export function useLogout() {
   return () => {
     clearAccessToken();
     router.replace("/login", { locale });
+  };
+}
+
+export function usePasswordResetRequestForm(initialEmail = "") {
+  const form = useForm<PasswordResetRequestFormValues>({
+    resolver: zodResolver(passwordResetRequestSchema),
+    defaultValues: { email: initialEmail },
+  });
+
+  const mutation = useMutation({
+    mutationFn: requestPasswordReset,
+  });
+
+  return {
+    form,
+    errorMessage: mutation.error instanceof Error ? mutation.error.message : "",
+    successMessage: mutation.isSuccess ? "Jika email terdaftar, link reset password sudah dikirim." : "",
+    isLoading: mutation.isPending,
+    onSubmit: form.handleSubmit((values) => mutation.mutate(values)),
+  };
+}
+
+export function useCurrentUserPasswordReset() {
+  return useMutation({
+    mutationFn: requestCurrentUserPasswordReset,
+  });
+}
+
+export function useChangePasswordForm() {
+  const form = useForm<ChangePasswordFormValues>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { oldPassword: "", newPassword: "", confirmPassword: "" },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (values: ChangePasswordFormValues) =>
+      changePassword({ oldPassword: values.oldPassword, newPassword: values.newPassword }),
+  });
+
+  return {
+    form,
+    errorMessage: mutation.error instanceof Error ? mutation.error.message : "",
+    successMessage: mutation.isSuccess ? "Password akun berhasil diperbarui." : "",
+    isLoading: mutation.isPending,
+    onSubmit: form.handleSubmit((values) => mutation.mutate(values)),
+  };
+}
+
+export function usePasswordResetConfirmForm(token: string) {
+  const form = useForm<PasswordResetConfirmFormValues>({
+    resolver: zodResolver(passwordResetConfirmSchema),
+    defaultValues: { password: "", confirmPassword: "" },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (values: PasswordResetConfirmFormValues) =>
+      confirmPasswordReset({ token, password: values.password }),
+  });
+
+  return {
+    form,
+    errorMessage: mutation.error instanceof Error ? mutation.error.message : "",
+    successMessage: mutation.isSuccess ? "Password baru berhasil disimpan. Silakan login kembali." : "",
+    isLoading: mutation.isPending,
+    isSuccess: mutation.isSuccess,
+    onSubmit: form.handleSubmit((values) => mutation.mutate(values)),
   };
 }

@@ -21,6 +21,7 @@ import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { PayoutPanel } from "../../leads/components/payout-panel";
 import { useLeadWebSocket } from "@/features/leads/hooks/use-lead-ws";
+import { SuspendAccountButton } from "./suspend-account-button";
 
 const MONTH_MAP: Record<string, number> = {
   januari: 0, februari: 1, maret: 2, april: 3, mei: 4, juni: 5,
@@ -299,6 +300,11 @@ export function AdminLeadDetailScreen({ leadId }: AdminLeadDetailScreenProps) {
                     hasMore={messages.data ? messages.data.length >= chatLimit : true}
                     headerActions={
                       <div className="flex items-center gap-1.5">
+                        {l.partnerSuspended ? (
+                          <span className="hidden md:inline-flex rounded-full border border-destructive/30 bg-destructive/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-destructive">
+                            Partner suspended
+                          </span>
+                        ) : null}
                         <Link
                           href="/admin/leads"
                           className="md:hidden flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer"
@@ -352,6 +358,12 @@ export function AdminLeadDetailScreen({ leadId }: AdminLeadDetailScreenProps) {
                           <div>Layanan: <span className="font-semibold text-foreground">{serviceLabel(l.serviceType)}</span></div>
                           <div>Dibuat: <span className="font-semibold text-foreground">{formatDate(l.createdAt)}</span></div>
                         </div>
+                        <SuspendAccountButton
+                          leadId={l.id}
+                          partnerId={l.partnerId}
+                          partnerName={l.partnerName}
+                          isSuspended={l.partnerSuspended}
+                        />
                       </div>
 
                       {/* Status form (Admin Update Status) */}
@@ -458,4 +470,3 @@ export function AdminLeadDetailScreen({ leadId }: AdminLeadDetailScreenProps) {
     </AppShell>
   );
 }
-

@@ -94,6 +94,17 @@ func (s *Store) Migrate() error {
 			password_hash TEXT NOT NULL,
 			role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'partner')),
 			partner_code TEXT NOT NULL DEFAULT '',
+			is_suspended INTEGER NOT NULL DEFAULT 0,
+			suspended_reason TEXT NOT NULL DEFAULT '',
+			suspended_at TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			token_hash TEXT NOT NULL UNIQUE,
+			expires_at TEXT NOT NULL,
+			used_at TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL
 		)`,
 		`CREATE TABLE IF NOT EXISTS service_catalog (
@@ -176,6 +187,7 @@ func (s *Store) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_lead_messages_unread ON lead_messages(lead_id, is_read)`,
 		`CREATE INDEX IF NOT EXISTS idx_referrals_partner ON referrals(partner_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_lead_payouts_lead ON lead_payouts(lead_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user ON password_reset_tokens(user_id, created_at DESC)`,
 	}
 
 	tx, err := s.db.Begin()
@@ -191,6 +203,15 @@ func (s *Store) Migrate() error {
 	}
 
 	if err := addColumnIfMissing(tx, "users", "username", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing(tx, "users", "is_suspended", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing(tx, "users", "suspended_reason", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing(tx, "users", "suspended_at", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
 	}
 
@@ -356,8 +377,8 @@ func (s *Store) SeedKnowledge(ctx context.Context) error {
 func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash string) error {
 	_, err := s.db.ExecContext(
 		ctx,
-		`INSERT INTO users (id, name, username, email, password_hash, role, partner_code, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO users (id, name, username, email, password_hash, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		user.ID,
 		user.Name,
 		strings.ToLower(user.Username),
@@ -365,6 +386,9 @@ func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash s
 		passwordHash,
 		user.Role,
 		user.PartnerCode,
+		boolToInt(user.IsSuspended),
+		user.SuspendedReason,
+		formatOptionalTime(user.SuspendedAt),
 		formatTime(user.CreatedAt),
 	)
 	return err
@@ -373,7 +397,7 @@ func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash s
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (domain.UserAuth, error) {
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, name, username, email, password_hash, role, partner_code, created_at
+		`SELECT id, name, username, email, password_hash, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
 		 FROM users
 		 WHERE email = ?`,
 		strings.ToLower(email),
@@ -385,7 +409,7 @@ func (s *Store) GetUserByLogin(ctx context.Context, login string) (domain.UserAu
 	login = strings.ToLower(strings.TrimSpace(login))
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, name, username, email, password_hash, role, partner_code, created_at
+		`SELECT id, name, username, email, password_hash, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
 		 FROM users
 		 WHERE email = ? OR username = ?`,
 		login,
@@ -394,23 +418,38 @@ func (s *Store) GetUserByLogin(ctx context.Context, login string) (domain.UserAu
 	return scanUserAuth(row)
 }
 
+func (s *Store) GetUserAuthByID(ctx context.Context, id string) (domain.UserAuth, error) {
+	row := s.db.QueryRowContext(
+		ctx,
+		`SELECT id, name, username, email, password_hash, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
+		 FROM users
+		 WHERE id = ?`,
+		id,
+	)
+	return scanUserAuth(row)
+}
+
 func (s *Store) GetUserByID(ctx context.Context, id string) (domain.User, error) {
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, name, username, email, role, partner_code, created_at
+		`SELECT id, name, username, email, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
 		 FROM users
 		 WHERE id = ?`,
 		id,
 	)
 
 	var user domain.User
+	var isSuspended int
+	var suspendedAt string
 	var createdAt string
-	if err := row.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &createdAt); err != nil {
+	if err := row.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.User{}, ErrNotFound
 		}
 		return domain.User{}, err
 	}
+	user.IsSuspended = intToBool(isSuspended)
+	user.SuspendedAt = parseOptionalTime(suspendedAt)
 	user.CreatedAt = parseTime(createdAt)
 	return user, nil
 }
@@ -434,7 +473,7 @@ func (s *Store) ListUsersByRoles(ctx context.Context, roles ...domain.Role) ([]d
 	rows, err := s.db.QueryContext(
 		ctx,
 		fmt.Sprintf(
-			`SELECT id, name, username, email, role, partner_code, created_at
+			`SELECT id, name, username, email, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
 			 FROM users
 			 WHERE role IN (%s)
 			 ORDER BY created_at ASC`,
@@ -450,10 +489,14 @@ func (s *Store) ListUsersByRoles(ctx context.Context, roles ...domain.Role) ([]d
 	users := []domain.User{}
 	for rows.Next() {
 		var user domain.User
+		var isSuspended int
+		var suspendedAt string
 		var createdAt string
-		if err := rows.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &createdAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt); err != nil {
 			return nil, err
 		}
+		user.IsSuspended = intToBool(isSuspended)
+		user.SuspendedAt = parseOptionalTime(suspendedAt)
 		user.CreatedAt = parseTime(createdAt)
 		users = append(users, user)
 	}
@@ -483,6 +526,145 @@ func (s *Store) SetRoleByEmail(ctx context.Context, email string, role domain.Ro
 		strings.ToLower(strings.TrimSpace(email)),
 	)
 	return err
+}
+
+func (s *Store) UpdateUserPassword(ctx context.Context, userID string, passwordHash string) error {
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE users
+		 SET password_hash = ?
+		 WHERE id = ?`,
+		passwordHash,
+		userID,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) UpdateUserSuspension(ctx context.Context, userID string, isSuspended bool, reason string) error {
+	suspendedAt := ""
+	if isSuspended {
+		suspendedAt = formatTime(time.Now().UTC())
+	}
+
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE users
+		 SET is_suspended = ?, suspended_reason = ?, suspended_at = ?
+		 WHERE id = ?`,
+		boolToInt(isSuspended),
+		strings.TrimSpace(reason),
+		suspendedAt,
+		userID,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) CreatePasswordResetToken(ctx context.Context, userID string, tokenHash string, expiresAt time.Time) error {
+	now := time.Now().UTC()
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at, used_at, created_at)
+		 VALUES (?, ?, ?, ?, '', ?)`,
+		uuid.NewString(),
+		userID,
+		tokenHash,
+		formatTime(expiresAt),
+		formatTime(now),
+	)
+	return err
+}
+
+func (s *Store) MarkPasswordResetTokensUsedByUser(ctx context.Context, userID string) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`UPDATE password_reset_tokens
+		 SET used_at = ?
+		 WHERE user_id = ? AND used_at = ''`,
+		formatTime(time.Now().UTC()),
+		userID,
+	)
+	return err
+}
+
+func (s *Store) GetPasswordResetToken(ctx context.Context, tokenHash string) (domain.User, string, error) {
+	row := s.db.QueryRowContext(
+		ctx,
+		`SELECT u.id, u.name, u.username, u.email, u.role, u.partner_code, u.is_suspended, u.suspended_reason, u.suspended_at, u.created_at,
+			t.id, t.expires_at, t.used_at
+		FROM password_reset_tokens t
+		INNER JOIN users u ON u.id = t.user_id
+		WHERE t.token_hash = ?`,
+		tokenHash,
+	)
+
+	var user domain.User
+	var tokenID string
+	var isSuspended int
+	var suspendedAt string
+	var createdAt string
+	var expiresAt string
+	var usedAt string
+	if err := row.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt, &tokenID, &expiresAt, &usedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.User{}, "", ErrNotFound
+		}
+		return domain.User{}, "", err
+	}
+
+	user.IsSuspended = intToBool(isSuspended)
+	user.SuspendedAt = parseOptionalTime(suspendedAt)
+	user.CreatedAt = parseTime(createdAt)
+
+	if usedAt != "" {
+		return domain.User{}, "", ErrNotFound
+	}
+	if parseTime(expiresAt).Before(time.Now().UTC()) {
+		return domain.User{}, "", ErrNotFound
+	}
+
+	return user, tokenID, nil
+}
+
+func (s *Store) MarkPasswordResetTokenUsed(ctx context.Context, tokenID string) error {
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE password_reset_tokens
+		 SET used_at = ?
+		 WHERE id = ? AND used_at = ''`,
+		formatTime(time.Now().UTC()),
+		tokenID,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) SeedServiceCatalog(ctx context.Context, services []domain.ServiceRule) error {
@@ -751,7 +933,7 @@ func (s *Store) ListAdminLeads(ctx context.Context, filters LeadFilters) ([]doma
 
 	query := `SELECT l.id, l.partner_id, l.company_name, l.contact_name, l.contact_email, l.contact_phone,
 			l.service_type, l.budget, l.need_summary, l.notes, l.status, l.qualification_score,
-			l.qualification_note, l.created_at, l.updated_at, u.name, u.email, u.partner_code,
+			l.qualification_note, l.created_at, l.updated_at, u.name, u.email, u.partner_code, u.is_suspended,
 			l.commission_rate, l.deal_amount,
 			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id AND m.is_read = 0 AND m.sender_role = 'partner'), 0) AS unread_count,
 			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id), 0) AS message_count,
@@ -857,7 +1039,7 @@ func (s *Store) GetLeadWithPartner(ctx context.Context, leadID string) (domain.L
 		ctx,
 		`SELECT l.id, l.partner_id, l.company_name, l.contact_name, l.contact_email, l.contact_phone,
 			l.service_type, l.budget, l.need_summary, l.notes, l.status, l.qualification_score,
-			l.qualification_note, l.created_at, l.updated_at, u.name, u.email, u.partner_code,
+			l.qualification_note, l.created_at, l.updated_at, u.name, u.email, u.partner_code, u.is_suspended,
 			l.commission_rate, l.deal_amount,
 			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id AND m.is_read = 0 AND m.sender_role = 'partner'), 0),
 			COALESCE((SELECT COUNT(*) FROM lead_messages m WHERE m.lead_id = l.id), 0),
@@ -1177,6 +1359,8 @@ type userAuthScanner interface {
 
 func scanUserAuth(row userAuthScanner) (domain.UserAuth, error) {
 	var user domain.UserAuth
+	var isSuspended int
+	var suspendedAt string
 	var createdAt string
 	if err := row.Scan(
 		&user.ID,
@@ -1186,6 +1370,9 @@ func scanUserAuth(row userAuthScanner) (domain.UserAuth, error) {
 		&user.PasswordHash,
 		&user.Role,
 		&user.PartnerCode,
+		&isSuspended,
+		&user.SuspendedReason,
+		&suspendedAt,
 		&createdAt,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -1193,6 +1380,8 @@ func scanUserAuth(row userAuthScanner) (domain.UserAuth, error) {
 		}
 		return domain.UserAuth{}, err
 	}
+	user.IsSuspended = intToBool(isSuspended)
+	user.SuspendedAt = parseOptionalTime(suspendedAt)
 	user.CreatedAt = parseTime(createdAt)
 	return user, nil
 }
@@ -1317,6 +1506,7 @@ func scanLeadWithPartnersWithCount(rows *sql.Rows) ([]domain.LeadWithPartner, er
 
 func scanLeadWithPartnerRowWithCount(row userAuthScanner) (domain.LeadWithPartner, error) {
 	var item domain.LeadWithPartner
+	var partnerSuspended int
 	var createdAt, updatedAt string
 	if err := row.Scan(
 		&item.ID, &item.PartnerID, &item.CompanyName, &item.ContactName,
@@ -1324,7 +1514,7 @@ func scanLeadWithPartnerRowWithCount(row userAuthScanner) (domain.LeadWithPartne
 		&item.NeedSummary, &item.Notes, &item.Status,
 		&item.QualificationScore, &item.QualificationNote,
 		&createdAt, &updatedAt,
-		&item.PartnerName, &item.PartnerEmail, &item.PartnerCode,
+		&item.PartnerName, &item.PartnerEmail, &item.PartnerCode, &partnerSuspended,
 		&item.CommissionRate, &item.DealAmount,
 		&item.UnreadCount, &item.MessageCount, &item.MeetingMessage,
 	); err != nil {
@@ -1333,6 +1523,7 @@ func scanLeadWithPartnerRowWithCount(row userAuthScanner) (domain.LeadWithPartne
 		}
 		return domain.LeadWithPartner{}, err
 	}
+	item.PartnerSuspended = intToBool(partnerSuspended)
 	item.CreatedAt = parseTime(createdAt)
 	item.UpdatedAt = parseTime(updatedAt)
 	return item, nil
@@ -1352,6 +1543,7 @@ func scanLeadWithPartners(rows *sql.Rows) ([]domain.LeadWithPartner, error) {
 
 func scanLeadWithPartnerRow(row userAuthScanner) (domain.LeadWithPartner, error) {
 	var item domain.LeadWithPartner
+	var partnerSuspended int
 	var createdAt string
 	var updatedAt string
 	if err := row.Scan(
@@ -1373,12 +1565,14 @@ func scanLeadWithPartnerRow(row userAuthScanner) (domain.LeadWithPartner, error)
 		&item.PartnerName,
 		&item.PartnerEmail,
 		&item.PartnerCode,
+		&partnerSuspended,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.LeadWithPartner{}, ErrNotFound
 		}
 		return domain.LeadWithPartner{}, err
 	}
+	item.PartnerSuspended = intToBool(partnerSuspended)
 	item.CreatedAt = parseTime(createdAt)
 	item.UpdatedAt = parseTime(updatedAt)
 	return item, nil
@@ -1408,6 +1602,13 @@ func parseTime(value string) time.Time {
 		return time.Time{}
 	}
 	return parsed
+}
+
+func parseOptionalTime(value string) time.Time {
+	if strings.TrimSpace(value) == "" {
+		return time.Time{}
+	}
+	return parseTime(value)
 }
 
 func labelStatuses(items []domain.BreakdownItem) []domain.BreakdownItem {
@@ -1465,8 +1666,15 @@ func intToBool(value int) bool {
 	return value == 1
 }
 
+func formatOptionalTime(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return formatTime(value)
+}
+
 func (s *Store) Cleanup(ctx context.Context) error {
-	tables := []string{"lead_payouts", "lead_messages", "lead_events", "leads", "referrals", "users", "service_catalog", "knowledge_articles"}
+	tables := []string{"lead_payouts", "lead_messages", "lead_events", "password_reset_tokens", "leads", "referrals", "users", "service_catalog", "knowledge_articles"}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

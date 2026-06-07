@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -17,8 +20,9 @@ import (
 )
 
 type AuthService struct {
-	store *store.Store
-	cfg   config.Config
+	store    *store.Store
+	cfg      config.Config
+	notifier *NotificationService
 }
 
 type RegisterInput struct {
@@ -39,6 +43,25 @@ type CreateAdminInput struct {
 	Password string `json:"password"`
 }
 
+type PasswordResetRequestInput struct {
+	Email string `json:"email"`
+}
+
+type PasswordResetConfirmInput struct {
+	Token    string `json:"token"`
+	Password string `json:"password"`
+}
+
+type ChangePasswordInput struct {
+	OldPassword string `json:"oldPassword"`
+	NewPassword string `json:"newPassword"`
+}
+
+type SuspensionInput struct {
+	IsSuspended bool   `json:"isSuspended"`
+	Reason      string `json:"reason"`
+}
+
 type AuthResult struct {
 	Token string      `json:"token"`
 	User  domain.User `json:"user"`
@@ -49,8 +72,8 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func NewAuthService(repository *store.Store, cfg config.Config) *AuthService {
-	return &AuthService{store: repository, cfg: cfg}
+func NewAuthService(repository *store.Store, cfg config.Config, notifier *NotificationService) *AuthService {
+	return &AuthService{store: repository, cfg: cfg, notifier: notifier}
 }
 
 func (s *AuthService) EnsureUser(ctx context.Context, name string, username string, email string, password string, role domain.Role) error {
@@ -147,6 +170,9 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (AuthResult, 
 	if err := bcrypt.CompareHashAndPassword([]byte(authUser.PasswordHash), []byte(input.Password)); err != nil {
 		return AuthResult{}, httpx.Unauthorized("Email, username, atau password salah")
 	}
+	if authUser.IsSuspended {
+		return AuthResult{}, httpx.Forbidden("Akun sedang disuspend dan tidak bisa diakses")
+	}
 
 	token, err := s.issueToken(authUser.User)
 	if err != nil {
@@ -164,7 +190,136 @@ func (s *AuthService) Me(ctx context.Context, userID string) (domain.User, error
 		}
 		return domain.User{}, err
 	}
+	if user.IsSuspended {
+		return domain.User{}, httpx.Forbidden("Akun sedang disuspend dan tidak bisa diakses")
+	}
 	return user, nil
+}
+
+func (s *AuthService) RequestPasswordReset(ctx context.Context, input PasswordResetRequestInput) error {
+	email := strings.ToLower(strings.TrimSpace(input.Email))
+	if email == "" {
+		return httpx.Validation("Email wajib diisi", "")
+	}
+	if s.notifier == nil || !s.notifier.Enabled() {
+		return httpx.Validation("Fitur reset password email belum aktif", "Konfigurasikan RESEND_API_KEY dan RESEND_FROM_EMAIL terlebih dahulu.")
+	}
+
+	user, err := s.store.GetUserByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	token, err := randomToken(32)
+	if err != nil {
+		return err
+	}
+	tokenHash := hashToken(token)
+	if err := s.store.MarkPasswordResetTokensUsedByUser(ctx, user.ID); err != nil {
+		return err
+	}
+	if err := s.store.CreatePasswordResetToken(ctx, user.ID, tokenHash, time.Now().UTC().Add(30*time.Minute)); err != nil {
+		return err
+	}
+
+	s.notifier.NotifyPasswordReset(ctx, user.Email, s.notifier.PasswordResetURL(token))
+	return nil
+}
+
+func (s *AuthService) RequestPasswordResetForUser(ctx context.Context, userID string) error {
+	user, err := s.store.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return httpx.NotFound("Pengguna tidak ditemukan")
+		}
+		return err
+	}
+	return s.RequestPasswordReset(ctx, PasswordResetRequestInput{Email: user.Email})
+}
+
+func (s *AuthService) ChangePassword(ctx context.Context, userID string, input ChangePasswordInput) error {
+	if strings.TrimSpace(input.OldPassword) == "" || len(input.NewPassword) < 8 {
+		return httpx.Validation("Password lama atau password baru belum valid", "Password baru minimal 8 karakter.")
+	}
+
+	authUser, err := s.store.GetUserAuthByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return httpx.NotFound("Pengguna tidak ditemukan")
+		}
+		return err
+	}
+	if authUser.IsSuspended {
+		return httpx.Forbidden("Akun sedang disuspend dan tidak bisa diakses")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(authUser.PasswordHash), []byte(input.OldPassword)); err != nil {
+		return httpx.Validation("Password lama tidak sesuai", "")
+	}
+
+	hash, err := hashPassword(input.NewPassword)
+	if err != nil {
+		return err
+	}
+	return s.store.UpdateUserPassword(ctx, userID, hash)
+}
+
+func (s *AuthService) ConfirmPasswordReset(ctx context.Context, input PasswordResetConfirmInput) error {
+	token := strings.TrimSpace(input.Token)
+	if token == "" || len(input.Password) < 8 {
+		return httpx.Validation("Token atau password baru belum valid", "Password minimal 8 karakter dan token reset wajib diisi.")
+	}
+
+	user, tokenID, err := s.store.GetPasswordResetToken(ctx, hashToken(token))
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return httpx.Validation("Token reset password tidak valid atau sudah kedaluwarsa", "")
+		}
+		return err
+	}
+	if user.IsSuspended {
+		return httpx.Forbidden("Akun sedang disuspend dan tidak bisa diakses")
+	}
+
+	hash, err := hashPassword(input.Password)
+	if err != nil {
+		return err
+	}
+	if err := s.store.UpdateUserPassword(ctx, user.ID, hash); err != nil {
+		return err
+	}
+	if err := s.store.MarkPasswordResetTokenUsed(ctx, tokenID); err != nil {
+		return err
+	}
+	if err := s.store.MarkPasswordResetTokensUsedByUser(ctx, user.ID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *AuthService) UpdateUserSuspension(ctx context.Context, actor domain.User, userID string, input SuspensionInput) error {
+	target, err := s.store.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return httpx.NotFound("Pengguna tidak ditemukan")
+		}
+		return err
+	}
+	if target.ID == actor.ID {
+		return httpx.Validation("Akun sendiri tidak bisa disuspend", "")
+	}
+	if target.Role.IsAdminScope() && actor.Role != domain.RoleSuperAdmin {
+		return httpx.Forbidden("Hanya super admin yang dapat mengubah status akun admin")
+	}
+	if target.Role == domain.RoleSuperAdmin {
+		return httpx.Forbidden("Akun super admin tidak dapat disuspend")
+	}
+	if input.IsSuspended && strings.TrimSpace(input.Reason) == "" {
+		return httpx.Validation("Alasan suspend wajib diisi", "")
+	}
+	return s.store.UpdateUserSuspension(ctx, userID, input.IsSuspended, input.Reason)
 }
 
 func (s *AuthService) ParseToken(tokenValue string) (Claims, error) {
@@ -286,4 +441,17 @@ func referralSuffix(product string) string {
 		return cleaned[:5]
 	}
 	return cleaned
+}
+
+func randomToken(size int) (string, error) {
+	bytes := make([]byte, size)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+func hashToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }

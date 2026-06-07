@@ -29,6 +29,26 @@ class ApiClient {
     return AuthResult.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<void> requestPasswordReset(String email) async {
+    await _request(
+      'POST',
+      '/auth/password-reset/request',
+      body: {'email': email},
+    );
+  }
+
+  Future<void> requestCurrentUserPasswordReset() async {
+    await _request('POST', '/me/password-reset');
+  }
+
+  Future<void> changePassword(String oldPassword, String newPassword) async {
+    await _request(
+      'POST',
+      '/me/password-change',
+      body: {'oldPassword': oldPassword, 'newPassword': newPassword},
+    );
+  }
+
   Future<User> me() async {
     final data = await _request('GET', '/me');
     return User.fromJson(data as Map<String, dynamic>);

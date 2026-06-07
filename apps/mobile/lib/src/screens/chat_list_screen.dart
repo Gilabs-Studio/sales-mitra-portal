@@ -173,6 +173,29 @@ class LeadChatTile extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if (lead.partnerSuspended)
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: MitraColors.destructive.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(99),
+                            border: Border.all(
+                              color: MitraColors.destructive.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: const Text(
+                            'Suspended',
+                            style: TextStyle(
+                              color: MitraColors.destructive,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
                       Text(
                         compactDate(lead.createdAt),
                         style: TextStyle(
@@ -187,6 +210,18 @@ class LeadChatTile extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
+                  if (lead.partnerSuspended)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        'Akun partner ini sedang disuspend. Login dan aksi akun diblokir.',
+                        style: TextStyle(
+                          color: MitraColors.destructive,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   Row(
                     children: [
                       Expanded(

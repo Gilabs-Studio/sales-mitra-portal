@@ -44,10 +44,13 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiEnvelope<unknown>>) => {
-    if (error.response?.status === 401) {
+    const payload = error.response?.data?.error;
+    if (
+      error.response?.status === 401 ||
+      (error.response?.status === 403 && payload?.message?.toLowerCase().includes("disuspend"))
+    ) {
       clearAccessToken();
     }
-    const payload = error.response?.data?.error;
     throw new ApiClientError(
       payload?.message ?? "Request gagal diproses",
       payload?.code ?? "REQUEST_ERROR",

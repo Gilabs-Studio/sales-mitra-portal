@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Download, LogOut, Smartphone } from "lucide-react";
+import { Download, KeyRound, LogOut, Smartphone } from "lucide-react";
 import { Link, usePathname } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 import { useLogout } from "@/features/auth/hooks/use-auth";
@@ -150,6 +150,13 @@ export function AppShell({ user, children, noPadding }: AppShellProps) {
                     </div>
                   </div>
                   <div className="my-1 border-t border-border/60" />
+                  <Link
+                    href="/change-password"
+                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md cursor-pointer transition-colors"
+                  >
+                    <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
+                    Ubah password
+                  </Link>
                   <button
                     type="button"
                     onClick={logout}

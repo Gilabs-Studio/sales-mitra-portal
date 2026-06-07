@@ -70,10 +70,14 @@ func NewRouter(
 	api.GET("/catalog/services", handler.serviceCatalog)
 	api.POST("/auth/register", handler.register)
 	api.POST("/auth/login", handler.login)
+	api.POST("/auth/password-reset/request", handler.requestPasswordReset)
+	api.POST("/auth/password-reset/confirm", handler.confirmPasswordReset)
 
 	protected := api.Group("")
 	protected.Use(handler.requireAuth())
 	protected.GET("/me", handler.me)
+	protected.POST("/me/password-change", handler.changePassword)
+	protected.POST("/me/password-reset", handler.requestCurrentUserPasswordReset)
 	protected.GET("/knowledge", handler.knowledge)
 	protected.POST("/chatbot/ask", handler.askChatbot)
 
@@ -108,6 +112,7 @@ func NewRouter(
 	admin.PATCH("/leads/:id/commission", handler.updateLeadCommission)
 	admin.POST("/leads/:id/payouts", handler.createPayout)
 	admin.GET("/leads/:id/payouts", handler.getPayouts)
+	admin.PATCH("/users/:id/suspension", handler.updateUserSuspension)
 	admin.GET("/admins", requireRole(domain.RoleSuperAdmin), handler.listAdmins)
 	admin.POST("/admins", requireRole(domain.RoleSuperAdmin), handler.createAdmin)
 
@@ -195,8 +200,62 @@ func (h Handler) login(c *gin.Context) {
 	httpx.OK(c, "Login berhasil", result)
 }
 
+func (h Handler) requestPasswordReset(c *gin.Context) {
+	var input service.PasswordResetRequestInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload reset password tidak valid", err.Error()))
+		return
+	}
+
+	if err := h.authService.RequestPasswordReset(c.Request.Context(), input); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Jika email terdaftar, link reset password akan dikirim", gin.H{})
+}
+
+func (h Handler) confirmPasswordReset(c *gin.Context) {
+	var input service.PasswordResetConfirmInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload konfirmasi reset password tidak valid", err.Error()))
+		return
+	}
+
+	if err := h.authService.ConfirmPasswordReset(c.Request.Context(), input); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Password berhasil diperbarui", gin.H{})
+}
+
 func (h Handler) me(c *gin.Context) {
 	httpx.OK(c, "Profil aktif", currentUser(c))
+}
+
+func (h Handler) requestCurrentUserPasswordReset(c *gin.Context) {
+	if err := h.authService.RequestPasswordResetForUser(c.Request.Context(), currentUser(c).ID); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Link reset password telah dikirim ke email akun", gin.H{})
+}
+
+func (h Handler) changePassword(c *gin.Context) {
+	var input service.ChangePasswordInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload ubah password tidak valid", err.Error()))
+		return
+	}
+
+	if err := h.authService.ChangePassword(c.Request.Context(), currentUser(c).ID, input); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Password berhasil diperbarui", gin.H{})
 }
 
 func (h Handler) serviceCatalog(c *gin.Context) {
@@ -388,6 +447,21 @@ func (h Handler) listAdmins(c *gin.Context) {
 	}
 
 	httpx.OK(c, "Daftar admin", admins)
+}
+
+func (h Handler) updateUserSuspension(c *gin.Context) {
+	var input service.SuspensionInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload suspend akun tidak valid", err.Error()))
+		return
+	}
+
+	if err := h.authService.UpdateUserSuspension(c.Request.Context(), currentUser(c), c.Param("id"), input); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Status suspend akun diperbarui", gin.H{})
 }
 
 func (h Handler) upsertService(c *gin.Context) {

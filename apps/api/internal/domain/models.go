@@ -47,13 +47,16 @@ const (
 )
 
 type User struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Username    string    `json:"username"`
-	Email       string    `json:"email"`
-	Role        Role      `json:"role"`
-	PartnerCode string    `json:"partnerCode"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID              string    `json:"id"`
+	Name            string    `json:"name"`
+	Username        string    `json:"username"`
+	Email           string    `json:"email"`
+	Role            Role      `json:"role"`
+	PartnerCode     string    `json:"partnerCode"`
+	IsSuspended     bool      `json:"isSuspended"`
+	SuspendedReason string    `json:"suspendedReason"`
+	SuspendedAt     time.Time `json:"suspendedAt,omitempty"`
+	CreatedAt       time.Time `json:"createdAt"`
 }
 
 type UserAuth struct {
@@ -97,12 +100,13 @@ type Lead struct {
 
 type LeadWithPartner struct {
 	Lead
-	PartnerName    string `json:"partnerName"`
-	PartnerEmail   string `json:"partnerEmail"`
-	PartnerCode    string `json:"partnerCode"`
-	UnreadCount    int    `json:"unreadCount"`
-	MessageCount   int    `json:"messageCount"`
-	MeetingMessage string `json:"meetingMessage"`
+	PartnerName      string `json:"partnerName"`
+	PartnerEmail     string `json:"partnerEmail"`
+	PartnerCode      string `json:"partnerCode"`
+	PartnerSuspended bool   `json:"partnerSuspended"`
+	UnreadCount      int    `json:"unreadCount"`
+	MessageCount     int    `json:"messageCount"`
+	MeetingMessage   string `json:"meetingMessage"`
 }
 
 type LeadEvent struct {

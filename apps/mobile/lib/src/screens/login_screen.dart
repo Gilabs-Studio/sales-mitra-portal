@@ -120,6 +120,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       : const Icon(Icons.login),
                   label: const Text('Masuk'),
                 ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: state.isBusy ? null : () => _requestResetPassword(state),
+                  child: const Text('Lupa password?'),
+                ),
               ],
             );
           },
@@ -137,6 +142,64 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } catch (_) {
       // Error message is already stored in AppState.
+    }
+  }
+
+  Future<void> _requestResetPassword(AppState state) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final resetEmailController = TextEditingController(
+      text: emailController.text.trim(),
+    );
+
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Reset password'),
+            content: TextField(
+              controller: resetEmailController,
+              keyboardType: TextInputType.emailAddress,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Email akun',
+                hintText: 'nama@domain.com',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Batal'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Kirim link'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (confirmed != true || !mounted) {
+        return;
+      }
+
+      await state.requestPasswordReset(resetEmailController.text);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Jika email terdaftar, link reset password sudah dikirim.'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(state.errorMessage ?? 'Gagal mengirim reset password.'),
+        ),
+      );
+    } finally {
+      resetEmailController.dispose();
     }
   }
 }

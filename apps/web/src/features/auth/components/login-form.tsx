@@ -13,6 +13,7 @@ export function LoginForm() {
     register,
     formState: { errors },
   } = form;
+  const suspendedMessage = errorMessage.toLowerCase().includes("disuspend");
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
@@ -28,11 +29,24 @@ export function LoginForm() {
           {errors.password ? <FieldError>{errors.password.message}</FieldError> : null}
         </Field>
       </FieldGroup>
-      {errorMessage ? <FieldError>{errorMessage}</FieldError> : null}
+      {errorMessage ? (
+        suspendedMessage ? (
+          <div className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive">
+            {errorMessage}
+          </div>
+        ) : (
+          <FieldError>{errorMessage}</FieldError>
+        )
+      ) : null}
       <Button type="submit" isLoading={isLoading} className="w-full">
         <LogIn className="h-4 w-4" aria-hidden="true" />
         Masuk
       </Button>
+      <p className="text-center text-sm text-muted-foreground">
+        <Link href="/reset-password" className="font-semibold text-foreground underline underline-offset-4">
+          Lupa password?
+        </Link>
+      </p>
       <p className="text-center text-sm text-muted-foreground">
         Belum punya akun?{" "}
         <Link href="/register" className="font-semibold text-foreground underline underline-offset-4">

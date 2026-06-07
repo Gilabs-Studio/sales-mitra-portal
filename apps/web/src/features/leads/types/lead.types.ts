@@ -29,6 +29,7 @@ export type LeadWithPartner = Lead & {
   partnerName: string;
   partnerEmail: string;
   partnerCode: string;
+  partnerSuspended: boolean;
   unreadCount: number;
   messageCount: number;
   meetingMessage?: string;

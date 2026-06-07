@@ -6,6 +6,9 @@ const apiInternalUrl = process.env.API_INTERNAL_URL ?? "http://localhost:8080";
 const nextConfig: NextConfig = {
   typedRoutes: true,
   output: "standalone",
+  turbopack: {
+    root: import.meta.dirname,
+  },
   async rewrites() {
     return [
       {

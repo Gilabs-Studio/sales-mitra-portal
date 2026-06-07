@@ -98,6 +98,27 @@ class AppState extends ChangeNotifier {
     });
   }
 
+  Future<void> requestPasswordReset(String email) async {
+    await _run(() async {
+      await api.requestPasswordReset(email.trim());
+    });
+  }
+
+  Future<void> requestCurrentUserPasswordReset() async {
+    await _run(() async {
+      await api.requestCurrentUserPasswordReset();
+    });
+  }
+
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    await _run(() async {
+      await api.changePassword(oldPassword.trim(), newPassword.trim());
+    });
+  }
+
   void setSearch(String value) {
     search = value;
     notifyListeners();
@@ -125,6 +146,9 @@ class AppState extends ChangeNotifier {
       await action();
     } on ApiClientException catch (error) {
       errorMessage = error.message;
+      if (error.message.toLowerCase().contains('disuspend')) {
+        logout();
+      }
       rethrow;
     } catch (error) {
       errorMessage = error.toString();

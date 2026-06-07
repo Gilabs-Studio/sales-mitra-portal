@@ -85,6 +85,20 @@ class _ChatScreenState extends State<ChatScreen> {
                             fontSize: 12,
                           ),
                         ),
+                        if (activeLead.partnerSuspended)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: Text(
+                              'Akun partner sedang disuspend',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: MitraColors.destructive,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -108,6 +122,21 @@ class _ChatScreenState extends State<ChatScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                if (activeLead?.partnerSuspended == true)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                    color: MitraColors.destructive.withValues(alpha: 0.08),
+                    child: const Text(
+                      'Akun partner ini sedang disuspend. Pengguna tidak bisa login atau melakukan aksi baru sampai diaktifkan kembali.',
+                      style: TextStyle(
+                        color: MitraColors.destructive,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
                 Expanded(
                   child: Container(
                     decoration: const BoxDecoration(color: MitraColors.muted),

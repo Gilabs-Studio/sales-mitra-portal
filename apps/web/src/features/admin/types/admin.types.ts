@@ -7,6 +7,11 @@ export type CreateAdminPayload = {
   password: string;
 };
 
+export type UpdateUserSuspensionPayload = {
+  isSuspended: boolean;
+  reason: string;
+};
+
 export type AdminUser = {
   id: string;
   name: string;
@@ -14,6 +19,8 @@ export type AdminUser = {
   email: string;
   role: Role;
   partnerCode: string;
+  isSuspended: boolean;
+  suspendedReason: string;
   createdAt: string;
 };
 

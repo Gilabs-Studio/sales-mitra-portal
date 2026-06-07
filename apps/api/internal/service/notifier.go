@@ -135,6 +135,26 @@ func (s *NotificationService) AdminChatURL(leadID string) string {
 	return joinURL(s.appBaseURL, "/admin/chat?id="+leadID)
 }
 
+func (s *NotificationService) PasswordResetURL(token string) string {
+	return joinURL(s.appBaseURL, "/id/reset-password/confirm?token="+token)
+}
+
+func (s *NotificationService) NotifyPasswordReset(ctx context.Context, recipient string, resetURL string) {
+	email := notificationEmail{
+		Subject: "Reset password akun GiLabs",
+		Text: strings.TrimSpace(fmt.Sprintf(
+			"Kami menerima permintaan reset password untuk akun GiLabs Anda.\n\nBuka link berikut untuk membuat password baru. Link ini hanya dapat dipakai satu kali.\n%s\n\nJika Anda tidak meminta reset password, abaikan email ini.",
+			resetURL,
+		)),
+		HTML: fmt.Sprintf(
+			"<p>Kami menerima permintaan reset password untuk akun GiLabs Anda.</p><p><a href=\"%s\">Buat password baru</a></p><p>Link ini hanya dapat dipakai satu kali. Jika Anda tidak meminta reset password, abaikan email ini.</p>",
+			html.EscapeString(resetURL),
+		),
+	}
+
+	s.sendAsync(ctx, []string{recipient}, email)
+}
+
 func (s *NotificationService) sendAsync(parent context.Context, recipients []string, email notificationEmail) {
 	if !s.Enabled() {
 		return

@@ -12,9 +12,12 @@ export function rolePath(role: Role): ScopeRole {
 export type User = {
   id: string;
   name: string;
+  username: string;
   email: string;
   role: Role;
   partnerCode: string;
+  isSuspended: boolean;
+  suspendedReason: string;
   createdAt: string;
 };
 
@@ -32,4 +35,18 @@ export type RegisterPayload = {
   name: string;
   email: string;
   password: string;
+};
+
+export type PasswordResetRequestPayload = {
+  email: string;
+};
+
+export type PasswordResetConfirmPayload = {
+  token: string;
+  password: string;
+};
+
+export type ChangePasswordPayload = {
+  oldPassword: string;
+  newPassword: string;
 };

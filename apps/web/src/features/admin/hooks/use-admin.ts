@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createAdmin, listAdmins, listPartners } from "../services/admin.service";
+import { createAdmin, listAdmins, listPartners, updateUserSuspension } from "../services/admin.service";
 
 export function useAdminPartners() {
   return useQuery({
@@ -24,6 +24,20 @@ export function useCreateAdmin() {
     mutationFn: createAdmin,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+  });
+}
+
+export function useUpdateUserSuspension(userId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { isSuspended: boolean; reason: string }) =>
+      updateUserSuspension(userId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      void queryClient.invalidateQueries({ queryKey: ["partner"] });
     },
   });
 }
