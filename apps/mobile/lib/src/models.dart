@@ -1,4 +1,4 @@
-enum UserRole { admin, partner }
+enum UserRole { superAdmin, admin, partner }
 
 enum LeadStatus { submitted, qualified, contacted, won, lost, rejected }
 
@@ -215,8 +215,15 @@ class KnowledgeArticle {
 }
 
 UserRole parseRole(String value) {
-  return value == 'admin' ? UserRole.admin : UserRole.partner;
+  return switch (value) {
+    'super_admin' => UserRole.superAdmin,
+    'admin' => UserRole.admin,
+    _ => UserRole.partner,
+  };
 }
+
+bool isAdminRole(UserRole role) =>
+    role == UserRole.admin || role == UserRole.superAdmin;
 
 LeadStatus parseLeadStatus(String value) {
   return LeadStatus.values.firstWhere(
@@ -225,7 +232,7 @@ LeadStatus parseLeadStatus(String value) {
   );
 }
 
-String rolePath(UserRole role) => role == UserRole.admin ? 'admin' : 'partner';
+String rolePath(UserRole role) => isAdminRole(role) ? 'admin' : 'partner';
 
 String statusLabel(LeadStatus status) {
   return switch (status) {

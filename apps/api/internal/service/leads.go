@@ -120,7 +120,7 @@ func (s *LeadService) SendMessage(ctx context.Context, leadID string, sender dom
 		LeadID:     leadID,
 		SenderID:   sender.ID,
 		SenderName: sender.Name,
-		SenderRole: string(sender.Role),
+		SenderRole: string(sender.Role.OperationalRole()),
 		Message:    strings.TrimSpace(message),
 	})
 	if err != nil {
@@ -159,13 +159,13 @@ func (s *LeadService) notifyPartnerAboutLeadUpdate(ctx context.Context, lead dom
 }
 
 func (s *LeadService) notifyMessageRecipients(ctx context.Context, lead domain.LeadWithPartner, sender domain.User, message string) {
-	if sender.Role == domain.RoleAdmin {
+	if sender.Role.IsAdminScope() {
 		s.notifier.NotifyChatMessage(
 			ctx,
 			[]string{lead.PartnerEmail},
 			lead.CompanyName,
 			sender.Name,
-			string(sender.Role),
+			string(sender.Role.OperationalRole()),
 			message,
 			s.notifier.PartnerChatURL(lead.ID),
 		)
@@ -177,23 +177,30 @@ func (s *LeadService) notifyMessageRecipients(ctx context.Context, lead domain.L
 		s.adminRecipientEmails(ctx),
 		lead.CompanyName,
 		sender.Name,
-		string(sender.Role),
+		string(sender.Role.OperationalRole()),
 		message,
 		s.notifier.AdminChatURL(lead.ID),
 	)
 }
 
 func (s *LeadService) adminRecipientEmails(ctx context.Context) []string {
-	admins, err := s.store.ListUsersByRole(ctx, domain.RoleAdmin)
+	admins, err := s.store.ListUsersByRoles(ctx, domain.RoleSuperAdmin, domain.RoleAdmin)
 	if err != nil {
 		return []string{s.cfg.AdminEmail}
 	}
 
 	recipients := make([]string, 0, len(admins)+1)
+	seen := map[string]struct{}{}
 	for _, admin := range admins {
+		if _, exists := seen[admin.Email]; exists {
+			continue
+		}
+		seen[admin.Email] = struct{}{}
 		recipients = append(recipients, admin.Email)
 	}
-	recipients = append(recipients, s.cfg.AdminEmail)
+	if _, exists := seen[s.cfg.AdminEmail]; !exists {
+		recipients = append(recipients, s.cfg.AdminEmail)
+	}
 	return recipients
 }
 

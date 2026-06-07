@@ -92,7 +92,7 @@ func (s *Store) Migrate() error {
 			username TEXT NOT NULL DEFAULT '',
 			email TEXT NOT NULL UNIQUE,
 			password_hash TEXT NOT NULL,
-			role TEXT NOT NULL CHECK (role IN ('admin', 'partner')),
+			role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'partner')),
 			partner_code TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL
 		)`,
@@ -194,6 +194,10 @@ func (s *Store) Migrate() error {
 		return err
 	}
 
+	if err := updateUsersRoleConstraint(tx); err != nil {
+		return err
+	}
+
 	if err := addColumnIfMissing(tx, "leads", "commission_rate", "REAL NOT NULL DEFAULT 0.0"); err != nil {
 		return err
 	}
@@ -209,6 +213,53 @@ func (s *Store) Migrate() error {
 	}
 
 	return tx.Commit()
+}
+
+func updateUsersRoleConstraint(tx *sql.Tx) error {
+	var schemaSQL string
+	if err := tx.QueryRow(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'`).Scan(&schemaSQL); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+
+	if strings.Contains(schemaSQL, "'super_admin'") {
+		return nil
+	}
+
+	updatedSchema := strings.Replace(
+		schemaSQL,
+		"CHECK (role IN ('admin', 'partner'))",
+		"CHECK (role IN ('super_admin', 'admin', 'partner'))",
+		1,
+	)
+	if updatedSchema == schemaSQL {
+		return fmt.Errorf("gagal memperbarui constraint role users")
+	}
+
+	if _, err := tx.Exec(`PRAGMA writable_schema = ON`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE sqlite_master SET sql = ? WHERE type = 'table' AND name = 'users'`, updatedSchema); err != nil {
+		_, _ = tx.Exec(`PRAGMA writable_schema = OFF`)
+		return err
+	}
+
+	var schemaVersion int
+	if err := tx.QueryRow(`PRAGMA schema_version`).Scan(&schemaVersion); err != nil {
+		_, _ = tx.Exec(`PRAGMA writable_schema = OFF`)
+		return err
+	}
+	if _, err := tx.Exec(fmt.Sprintf(`PRAGMA schema_version = %d`, schemaVersion+1)); err != nil {
+		_, _ = tx.Exec(`PRAGMA writable_schema = OFF`)
+		return err
+	}
+	if _, err := tx.Exec(`PRAGMA writable_schema = OFF`); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func addColumnIfMissing(tx *sql.Tx, table string, column string, definition string) error {
@@ -365,13 +416,31 @@ func (s *Store) GetUserByID(ctx context.Context, id string) (domain.User, error)
 }
 
 func (s *Store) ListUsersByRole(ctx context.Context, role domain.Role) ([]domain.User, error) {
+	return s.ListUsersByRoles(ctx, role)
+}
+
+func (s *Store) ListUsersByRoles(ctx context.Context, roles ...domain.Role) ([]domain.User, error) {
+	if len(roles) == 0 {
+		return []domain.User{}, nil
+	}
+
+	placeholders := make([]string, 0, len(roles))
+	args := make([]interface{}, 0, len(roles))
+	for _, role := range roles {
+		placeholders = append(placeholders, "?")
+		args = append(args, role)
+	}
+
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT id, name, username, email, role, partner_code, created_at
-		 FROM users
-		 WHERE role = ?
-		 ORDER BY created_at ASC`,
-		role,
+		fmt.Sprintf(
+			`SELECT id, name, username, email, role, partner_code, created_at
+			 FROM users
+			 WHERE role IN (%s)
+			 ORDER BY created_at ASC`,
+			strings.Join(placeholders, ", "),
+		),
+		args...,
 	)
 	if err != nil {
 		return nil, err
@@ -399,6 +468,18 @@ func (s *Store) SetUsernameByEmail(ctx context.Context, email string, username s
 		 SET username = ?
 		 WHERE email = ?`,
 		strings.ToLower(strings.TrimSpace(username)),
+		strings.ToLower(strings.TrimSpace(email)),
+	)
+	return err
+}
+
+func (s *Store) SetRoleByEmail(ctx context.Context, email string, role domain.Role) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`UPDATE users
+		 SET role = ?
+		 WHERE email = ?`,
+		role,
 		strings.ToLower(strings.TrimSpace(email)),
 	)
 	return err

@@ -91,7 +91,7 @@ func NewRouter(
 	partner.GET("/leads/:id/payouts", handler.getPayouts)
 
 	admin := protected.Group("/admin")
-	admin.Use(requireRole(domain.RoleAdmin))
+	admin.Use(requireRoles(domain.RoleSuperAdmin, domain.RoleAdmin))
 	admin.GET("/dashboard", handler.adminDashboard)
 	admin.GET("/leads", handler.adminLeads)
 	admin.GET("/leads/:id", handler.adminLeadDetail)
@@ -108,6 +108,8 @@ func NewRouter(
 	admin.PATCH("/leads/:id/commission", handler.updateLeadCommission)
 	admin.POST("/leads/:id/payouts", handler.createPayout)
 	admin.GET("/leads/:id/payouts", handler.getPayouts)
+	admin.GET("/admins", requireRole(domain.RoleSuperAdmin), handler.listAdmins)
+	admin.POST("/admins", requireRole(domain.RoleSuperAdmin), handler.createAdmin)
 
 	router.Static("/uploads", "./data/uploads")
 
@@ -362,6 +364,32 @@ func (h Handler) adminServices(c *gin.Context) {
 	httpx.OK(c, "Daftar layanan", services)
 }
 
+func (h Handler) createAdmin(c *gin.Context) {
+	var input service.CreateAdminInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload admin tidak valid", err.Error()))
+		return
+	}
+
+	user, err := h.authService.CreateAdmin(c.Request.Context(), input)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.Created(c, "Admin berhasil ditambahkan", user)
+}
+
+func (h Handler) listAdmins(c *gin.Context) {
+	admins, err := h.store.ListUsersByRoles(c.Request.Context(), domain.RoleSuperAdmin, domain.RoleAdmin)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Daftar admin", admins)
+}
+
 func (h Handler) upsertService(c *gin.Context) {
 	var input service.ServiceRuleInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -498,14 +526,27 @@ func (h Handler) sendAdminMessage(c *gin.Context) {
 }
 
 func requireRole(role domain.Role) gin.HandlerFunc {
+	return requireRoles(role)
+}
+
+func requireRoles(roles ...domain.Role) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user := currentUser(c)
-		if user.Role != role {
+		for _, role := range roles {
+			if user.Role == role {
+				c.Next()
+				return
+			}
+		}
+
+		if len(roles) == 0 {
 			httpx.Fail(c, httpx.Forbidden("Akses tidak sesuai role"))
 			c.Abort()
 			return
 		}
-		c.Next()
+
+		httpx.Fail(c, httpx.Forbidden("Akses tidak sesuai role"))
+		c.Abort()
 	}
 }
 

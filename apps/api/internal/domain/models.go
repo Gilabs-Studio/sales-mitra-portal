@@ -5,9 +5,25 @@ import "time"
 type Role string
 
 const (
-	RoleAdmin   Role = "admin"
-	RolePartner Role = "partner"
+	RoleSuperAdmin Role = "super_admin"
+	RoleAdmin      Role = "admin"
+	RolePartner    Role = "partner"
 )
+
+func (r Role) IsAdminScope() bool {
+	return r == RoleSuperAdmin || r == RoleAdmin
+}
+
+func (r Role) IsValid() bool {
+	return r == RoleSuperAdmin || r == RoleAdmin || r == RolePartner
+}
+
+func (r Role) OperationalRole() Role {
+	if r.IsAdminScope() {
+		return RoleAdmin
+	}
+	return r
+}
 
 type ServiceType string
 

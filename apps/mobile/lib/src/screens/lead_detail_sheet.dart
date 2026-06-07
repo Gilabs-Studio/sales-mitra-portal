@@ -84,7 +84,7 @@ class LeadDetailSheet extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        if (state.role == UserRole.admin) ...[
+        if (isAdminRole(state.role)) ...[
           const SizedBox(height: 14),
           FilledButton.icon(
             onPressed: () => _showStatusDialog(context),

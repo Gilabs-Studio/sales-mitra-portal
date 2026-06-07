@@ -32,6 +32,13 @@ type LoginInput struct {
 	Password string `json:"password"`
 }
 
+type CreateAdminInput struct {
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 type AuthResult struct {
 	Token string      `json:"token"`
 	User  domain.User `json:"user"`
@@ -88,6 +95,39 @@ func (s *AuthService) RegisterPartner(ctx context.Context, input RegisterInput) 
 	}
 
 	return AuthResult{Token: token, User: user}, nil
+}
+
+func (s *AuthService) CreateAdmin(ctx context.Context, input CreateAdminInput) (domain.User, error) {
+	input.Name = strings.TrimSpace(input.Name)
+	input.Username = strings.ToLower(strings.TrimSpace(input.Username))
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
+
+	if input.Name == "" || input.Username == "" || input.Email == "" || len(input.Password) < 8 {
+		return domain.User{}, httpx.Validation("Data admin belum valid", "Nama, username, email, dan password minimal 8 karakter wajib diisi.")
+	}
+
+	hash, err := hashPassword(input.Password)
+	if err != nil {
+		return domain.User{}, err
+	}
+
+	user := domain.User{
+		ID:        uuid.NewString(),
+		Name:      input.Name,
+		Username:  input.Username,
+		Email:     input.Email,
+		Role:      domain.RoleAdmin,
+		CreatedAt: time.Now().UTC(),
+	}
+
+	if err := s.store.CreateUser(ctx, user, hash); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return domain.User{}, httpx.Conflict("Email atau username admin sudah terdaftar")
+		}
+		return domain.User{}, err
+	}
+
+	return user, nil
 }
 
 func (s *AuthService) Login(ctx context.Context, input LoginInput) (AuthResult, error) {
@@ -147,10 +187,19 @@ func (s *AuthService) ParseToken(tokenValue string) (Claims, error) {
 }
 
 func (s *AuthService) ensureUser(ctx context.Context, name string, username string, email string, password string, role domain.Role) error {
+	if !role.IsValid() {
+		return fmt.Errorf("role tidak valid: %s", role)
+	}
+
 	if authUser, err := s.store.GetUserByEmail(ctx, email); err == nil {
 		username = strings.ToLower(strings.TrimSpace(username))
 		if username != "" && authUser.Username == "" {
-			return s.store.SetUsernameByEmail(ctx, email, username)
+			if err := s.store.SetUsernameByEmail(ctx, email, username); err != nil {
+				return err
+			}
+		}
+		if authUser.Role != role {
+			return s.store.SetRoleByEmail(ctx, email, role)
 		}
 		return nil
 	} else if !errors.Is(err, store.ErrNotFound) {

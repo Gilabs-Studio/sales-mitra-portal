@@ -72,7 +72,11 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 18),
                   _ProfileLine(
                     label: 'Role',
-                    value: user?.role == UserRole.admin ? 'Admin' : 'Partner',
+                    value: user == null
+                        ? '-'
+                        : isAdminRole(user.role)
+                        ? (user.role == UserRole.superAdmin ? 'Super Admin' : 'Admin')
+                        : 'Partner',
                   ),
                   if ((user?.partnerCode ?? '').isNotEmpty)
                     _ProfileLine(

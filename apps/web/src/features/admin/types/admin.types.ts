@@ -1,5 +1,22 @@
 import type { Role } from "@/features/auth/types/auth.types";
 
+export type CreateAdminPayload = {
+  name: string;
+  username: string;
+  email: string;
+  password: string;
+};
+
+export type AdminUser = {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  role: Role;
+  partnerCode: string;
+  createdAt: string;
+};
+
 export type PartnerWithStats = {
   id: string;
   name: string;

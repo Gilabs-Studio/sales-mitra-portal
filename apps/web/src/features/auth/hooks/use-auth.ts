@@ -7,7 +7,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { loginSchema, registerSchema, type LoginFormValues, type RegisterFormValues } from "../schemas/auth.schema";
 import { getMe, login, registerPartner } from "../services/auth.service";
-import type { Role } from "../types/auth.types";
+import { isAdminRole, rolePath, type Role } from "../types/auth.types";
 import { clearAccessToken, getAccessToken, setAccessToken } from "../utils/auth-storage";
 import { useRouter } from "@/i18n/routing";
 
@@ -23,7 +23,7 @@ export function useLoginForm() {
     mutationFn: login,
     onSuccess: ({ token, user }) => {
       setAccessToken(token);
-      router.replace(user.role === "admin" ? "/admin" : "/partner", { locale });
+      router.replace(`/${rolePath(user.role)}`, { locale });
     },
   });
 
@@ -84,15 +84,18 @@ export function useAuthGuard(requiredRole?: Role) {
       router.replace("/login", { locale });
       return;
     }
-    if (requiredRole && query.data && query.data.role !== requiredRole) {
-      router.replace(query.data.role === "admin" ? "/admin" : "/partner", { locale });
+    if (requiredRole && query.data) {
+      const allowed = requiredRole === "admin" ? isAdminRole(query.data.role) : query.data.role === requiredRole;
+      if (!allowed) {
+        router.replace(`/${rolePath(query.data.role)}`, { locale });
+      }
     }
   }, [hasToken, locale, query.data, query.error, requiredRole, router]);
 
   return {
     user: query.data,
     isLoading: hasToken && query.isLoading,
-    isAllowed: Boolean(query.data && (!requiredRole || query.data.role === requiredRole)),
+    isAllowed: Boolean(query.data && (!requiredRole || (requiredRole === "admin" ? isAdminRole(query.data.role) : query.data.role === requiredRole))),
   };
 }
 

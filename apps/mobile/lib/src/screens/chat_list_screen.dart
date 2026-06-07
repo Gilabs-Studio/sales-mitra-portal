@@ -33,7 +33,7 @@ class ChatListScreen extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  user?.role == UserRole.admin
+                                  user != null && isAdminRole(user.role)
                                       ? 'Admin Leads'
                                       : 'Partner Leads',
                                   style: const TextStyle(
