@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { ArrowRight, TrendingUp, Zap, Shield } from "lucide-react";
+import { ArrowRight, Download, Smartphone, TrendingUp, Zap, Shield } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import {
   Card,
@@ -18,6 +18,7 @@ type PageProps = {
 export default async function HomePage({ params }: PageProps) {
   const { locale } = await params;
   const isEn = locale === "en";
+  const mobileDownloadUrl = process.env.NEXT_PUBLIC_MOBILE_APP_DOWNLOAD_URL;
 
   const t = {
     /* ── Nav ─────────────────────────────────────────────── */
@@ -215,6 +216,18 @@ export default async function HomePage({ params }: PageProps) {
           >
             {t.heroSecondary}
           </Link>
+          {mobileDownloadUrl ? (
+            <a
+              href={mobileDownloadUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
+            >
+              <Smartphone className="h-4 w-4" aria-hidden="true" />
+              {isEn ? "Download mobile app" : "Download aplikasi mobile"}
+              <Download className="h-4 w-4" aria-hidden="true" />
+            </a>
+          ) : null}
         </div>
       </section>
 

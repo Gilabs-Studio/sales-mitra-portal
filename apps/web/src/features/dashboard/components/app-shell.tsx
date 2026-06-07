@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { LogOut } from "lucide-react";
+import { Download, LogOut, Smartphone } from "lucide-react";
 import { Link, usePathname } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 import { useLogout } from "@/features/auth/hooks/use-auth";
@@ -39,6 +39,7 @@ export function AppShell({ user, children, noPadding }: AppShellProps) {
   const logout = useLogout();
   const items = user.role === "admin" ? adminNav : partnerNav;
   const unreadQuery = useUnreadCount(user.role);
+  const mobileDownloadUrl = process.env.NEXT_PUBLIC_MOBILE_APP_DOWNLOAD_URL;
 
   const [profileOpen, setProfileOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -75,6 +76,18 @@ export function AppShell({ user, children, noPadding }: AppShellProps) {
 
           {/* Navigation Menu & Profile */}
           <div className="flex items-center gap-6">
+            {mobileDownloadUrl ? (
+              <a
+                href={mobileDownloadUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="hidden lg:inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground transition-all duration-200 hover:bg-secondary"
+              >
+                <Smartphone className="h-3.5 w-3.5" aria-hidden="true" />
+                Download App
+                <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              </a>
+            ) : null}
             <nav className="flex items-center gap-5">
               {items.map((item) => {
                 const active = pathname === item.href || (item.href !== "/partner" && item.href !== "/admin" && pathname.startsWith(item.href));

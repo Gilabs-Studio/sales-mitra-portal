@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "sh -c 'pnpm --dir apps/api dev & pnpm --dir apps/web dev & wait'",
     "dev:web": "pnpm --dir apps/web dev",
-    "dev:mobile": "cd apps/mobile && flutter run",
+    "dev:mobile": "cd apps/mobile && flutter run --dart-define-from-file=.env",
     "build:web": "pnpm --dir apps/web build",
     "analyze:mobile": "cd apps/mobile && flutter analyze",
     "test:mobile": "cd apps/mobile && flutter test",

@@ -42,10 +42,11 @@ Mobile Flutter:
 
 ```bash
 cd apps/mobile
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8089/api/v1
+cp .env.example .env
+flutter run --dart-define-from-file=.env
 ```
 
-Gunakan `10.0.2.2` untuk Android emulator. Untuk device fisik, ganti `API_BASE_URL` ke alamat LAN mesin yang menjalankan API/proxy lokal.
+Isi `API_BASE_URL` di `apps/mobile/.env`. Untuk Android emulator gunakan `10.0.2.2`, untuk desktop runner atau simulator lokal gunakan `localhost`, dan untuk device fisik gunakan alamat LAN mesin yang menjalankan API/proxy lokal.
 
 ## API Response
 
