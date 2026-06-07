@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"image"
+	"image/jpeg"
 	_ "image/jpeg"
 	_ "image/png"
 	"mime/multipart"
@@ -16,9 +17,8 @@ import (
 	s3config "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/chai2010/webp"
-	"github.com/google/uuid"
 	"github.com/gilabs/mitra-sales-portal/apps/api/internal/config"
+	"github.com/google/uuid"
 )
 
 type UploadService struct {
@@ -68,22 +68,22 @@ func (s *UploadService) UploadEvidence(ctx context.Context, fileHeader *multipar
 		return "", fmt.Errorf("gagal decode gambar: %w. pastikan format JPG atau PNG", err)
 	}
 
-	// Convert to WebP in memory
-	var webpBuf bytes.Buffer
-	err = webp.Encode(&webpBuf, img, &webp.Options{Quality: 80})
+	// Convert to JPEG in memory to avoid CGO-dependent encoders in serverless builds.
+	var imageBuf bytes.Buffer
+	err = jpeg.Encode(&imageBuf, img, &jpeg.Options{Quality: 85})
 	if err != nil {
-		return "", fmt.Errorf("gagal konversi gambar ke WebP: %w", err)
+		return "", fmt.Errorf("gagal konversi gambar ke JPEG: %w", err)
 	}
 
-	filename := fmt.Sprintf("payout-%s-%d.webp", uuid.NewString(), time.Now().Unix())
+	filename := fmt.Sprintf("payout-%s-%d.jpg", uuid.NewString(), time.Now().Unix())
 
 	// If R2 client is configured, upload to Cloudflare R2
 	if s.s3Client != nil {
-		contentType := "image/webp"
+		contentType := "image/jpeg"
 		_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
 			Bucket:      aws.String(s.cfg.R2BucketName),
 			Key:         aws.String(filename),
-			Body:        bytes.NewReader(webpBuf.Bytes()),
+			Body:        bytes.NewReader(imageBuf.Bytes()),
 			ContentType: aws.String(contentType),
 		})
 		if err == nil {
@@ -108,7 +108,7 @@ func (s *UploadService) UploadEvidence(ctx context.Context, fileHeader *multipar
 	}
 
 	localPath := filepath.Join(localDir, filename)
-	err = os.WriteFile(localPath, webpBuf.Bytes(), 0644)
+	err = os.WriteFile(localPath, imageBuf.Bytes(), 0644)
 	if err != nil {
 		return "", fmt.Errorf("gagal menyimpan file bukti lokal: %w", err)
 	}
