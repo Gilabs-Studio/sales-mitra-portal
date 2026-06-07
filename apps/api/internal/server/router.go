@@ -249,10 +249,10 @@ func (h Handler) partnerLeads(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, "Daftar lead mitra", gin.H{
-		"data":      leads,
-		"total":     total,
-		"page":      filters.Offset/normalizePageSize(filters.Limit) + 1,
-		"pageSize":  normalizePageSize(filters.Limit),
+		"data":       leads,
+		"total":      total,
+		"page":       filters.Offset/normalizePageSize(filters.Limit) + 1,
+		"pageSize":   normalizePageSize(filters.Limit),
 		"totalPages": ceilDiv(total, normalizePageSize(filters.Limit)),
 	})
 }
@@ -310,10 +310,10 @@ func (h Handler) adminLeads(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, "Daftar lead admin", gin.H{
-		"data":      leads,
-		"total":     total,
-		"page":      filters.Offset/normalizePageSize(filters.Limit) + 1,
-		"pageSize":  normalizePageSize(filters.Limit),
+		"data":       leads,
+		"total":      total,
+		"page":       filters.Offset/normalizePageSize(filters.Limit) + 1,
+		"pageSize":   normalizePageSize(filters.Limit),
 		"totalPages": ceilDiv(total, normalizePageSize(filters.Limit)),
 	})
 }
@@ -468,13 +468,7 @@ func (h Handler) sendPartnerMessage(c *gin.Context) {
 		return
 	}
 	user := currentUser(c)
-	msg, err := h.store.SendMessage(c.Request.Context(), domain.LeadMessage{
-		LeadID:     c.Param("id"),
-		SenderID:   user.ID,
-		SenderName: user.Name,
-		SenderRole: "partner",
-		Message:    strings.TrimSpace(body.Message),
-	})
+	msg, err := h.leadService.SendMessage(c.Request.Context(), c.Param("id"), user, strings.TrimSpace(body.Message))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -493,13 +487,7 @@ func (h Handler) sendAdminMessage(c *gin.Context) {
 		return
 	}
 	user := currentUser(c)
-	msg, err := h.store.SendMessage(c.Request.Context(), domain.LeadMessage{
-		LeadID:     c.Param("id"),
-		SenderID:   user.ID,
-		SenderName: user.Name,
-		SenderRole: "admin",
-		Message:    strings.TrimSpace(body.Message),
-	})
+	msg, err := h.leadService.SendMessage(c.Request.Context(), c.Param("id"), user, strings.TrimSpace(body.Message))
 	if err != nil {
 		httpx.Fail(c, err)
 		return

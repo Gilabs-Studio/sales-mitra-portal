@@ -5,13 +5,16 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/gilabs/mitra-sales-portal/apps/api/internal/config"
 	"github.com/gilabs/mitra-sales-portal/apps/api/internal/domain"
 	"github.com/gilabs/mitra-sales-portal/apps/api/internal/httpx"
 	"github.com/gilabs/mitra-sales-portal/apps/api/internal/store"
 )
 
 type LeadService struct {
-	store *store.Store
+	store    *store.Store
+	cfg      config.Config
+	notifier *NotificationService
 }
 
 type LeadInput struct {
@@ -30,8 +33,12 @@ type UpdateLeadStatusInput struct {
 	Note   string            `json:"note"`
 }
 
-func NewLeadService(repository *store.Store) *LeadService {
-	return &LeadService{store: repository}
+func NewLeadService(repository *store.Store, cfg config.Config, notifier *NotificationService) *LeadService {
+	return &LeadService{
+		store:    repository,
+		cfg:      cfg,
+		notifier: notifier,
+	}
 }
 
 func (s *LeadService) ServiceRules(ctx context.Context) ([]domain.ServiceRule, error) {
@@ -68,7 +75,7 @@ func (s *LeadService) CreateLead(ctx context.Context, partnerID string, input Le
 	}
 
 	status, score, note := qualifyLead(input, rule)
-	return s.store.CreateLead(ctx, store.CreateLeadInput{
+	lead, err := s.store.CreateLead(ctx, store.CreateLeadInput{
 		PartnerID:          partnerID,
 		CompanyName:        input.CompanyName,
 		ContactName:        input.ContactName,
@@ -82,6 +89,16 @@ func (s *LeadService) CreateLead(ctx context.Context, partnerID string, input Le
 		QualificationScore: score,
 		QualificationNote:  note,
 	})
+	if err != nil {
+		return domain.Lead{}, err
+	}
+
+	partner, err := s.store.GetUserByID(ctx, partnerID)
+	if err == nil {
+		s.notifyAdminsAboutNewLead(ctx, lead, partner)
+	}
+
+	return lead, nil
 }
 
 func (s *LeadService) UpdateLeadStatus(ctx context.Context, leadID string, actorID string, input UpdateLeadStatusInput) (domain.LeadWithPartner, error) {
@@ -93,7 +110,91 @@ func (s *LeadService) UpdateLeadStatus(ctx context.Context, leadID string, actor
 	if err != nil {
 		return domain.LeadWithPartner{}, mapStoreError(err)
 	}
+
+	s.notifyPartnerAboutLeadUpdate(ctx, lead, strings.TrimSpace(input.Note))
 	return lead, nil
+}
+
+func (s *LeadService) SendMessage(ctx context.Context, leadID string, sender domain.User, message string) (domain.LeadMessage, error) {
+	msg, err := s.store.SendMessage(ctx, domain.LeadMessage{
+		LeadID:     leadID,
+		SenderID:   sender.ID,
+		SenderName: sender.Name,
+		SenderRole: string(sender.Role),
+		Message:    strings.TrimSpace(message),
+	})
+	if err != nil {
+		return domain.LeadMessage{}, err
+	}
+
+	lead, err := s.store.GetLeadWithPartner(ctx, leadID)
+	if err == nil {
+		s.notifyMessageRecipients(ctx, lead, sender, msg.Message)
+	}
+
+	return msg, nil
+}
+
+func (s *LeadService) notifyAdminsAboutNewLead(ctx context.Context, lead domain.Lead, partner domain.User) {
+	recipients := s.adminRecipientEmails(ctx)
+	s.notifier.NotifyAdminsNewLead(
+		ctx,
+		recipients,
+		lead.CompanyName,
+		partner.Name,
+		string(lead.ServiceType),
+		s.notifier.AdminLeadURL(lead.ID),
+	)
+}
+
+func (s *LeadService) notifyPartnerAboutLeadUpdate(ctx context.Context, lead domain.LeadWithPartner, note string) {
+	s.notifier.NotifyPartnerLeadUpdated(
+		ctx,
+		lead.PartnerEmail,
+		lead.CompanyName,
+		string(lead.Status),
+		note,
+		s.notifier.PartnerLeadURL(lead.ID),
+	)
+}
+
+func (s *LeadService) notifyMessageRecipients(ctx context.Context, lead domain.LeadWithPartner, sender domain.User, message string) {
+	if sender.Role == domain.RoleAdmin {
+		s.notifier.NotifyChatMessage(
+			ctx,
+			[]string{lead.PartnerEmail},
+			lead.CompanyName,
+			sender.Name,
+			string(sender.Role),
+			message,
+			s.notifier.PartnerChatURL(lead.ID),
+		)
+		return
+	}
+
+	s.notifier.NotifyChatMessage(
+		ctx,
+		s.adminRecipientEmails(ctx),
+		lead.CompanyName,
+		sender.Name,
+		string(sender.Role),
+		message,
+		s.notifier.AdminChatURL(lead.ID),
+	)
+}
+
+func (s *LeadService) adminRecipientEmails(ctx context.Context) []string {
+	admins, err := s.store.ListUsersByRole(ctx, domain.RoleAdmin)
+	if err != nil {
+		return []string{s.cfg.AdminEmail}
+	}
+
+	recipients := make([]string, 0, len(admins)+1)
+	for _, admin := range admins {
+		recipients = append(recipients, admin.Email)
+	}
+	recipients = append(recipients, s.cfg.AdminEmail)
+	return recipients
 }
 
 func qualifyLead(input LeadInput, rule domain.ServiceRule) (domain.LeadStatus, int, string) {

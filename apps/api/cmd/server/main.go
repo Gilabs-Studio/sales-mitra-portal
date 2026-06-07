@@ -26,7 +26,8 @@ func main() {
 	}
 
 	authService := service.NewAuthService(repository, cfg)
-	leadService := service.NewLeadService(repository)
+	notificationService := service.NewNotificationService(cfg)
+	leadService := service.NewLeadService(repository, cfg, notificationService)
 	knowledgeService := service.NewKnowledgeService(repository)
 	serviceCatalogService := service.NewServiceCatalogService(repository)
 

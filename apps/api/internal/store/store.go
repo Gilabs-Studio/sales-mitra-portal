@@ -364,6 +364,34 @@ func (s *Store) GetUserByID(ctx context.Context, id string) (domain.User, error)
 	return user, nil
 }
 
+func (s *Store) ListUsersByRole(ctx context.Context, role domain.Role) ([]domain.User, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT id, name, username, email, role, partner_code, created_at
+		 FROM users
+		 WHERE role = ?
+		 ORDER BY created_at ASC`,
+		role,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := []domain.User{}
+	for rows.Next() {
+		var user domain.User
+		var createdAt string
+		if err := rows.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &createdAt); err != nil {
+			return nil, err
+		}
+		user.CreatedAt = parseTime(createdAt)
+		users = append(users, user)
+	}
+
+	return users, rows.Err()
+}
+
 func (s *Store) SetUsernameByEmail(ctx context.Context, email string, username string) error {
 	_, err := s.db.ExecContext(
 		ctx,

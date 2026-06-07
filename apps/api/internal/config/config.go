@@ -9,22 +9,24 @@ import (
 )
 
 type Config struct {
-	Port             string
-	DatabaseURL      string
-	JWTSecret        string
-	JWTExpiresIn     time.Duration
-	WebOrigin        string
-	WebOrigins       []string
-	AdminName        string
-	AdminUsername    string
-	AdminEmail       string
-	AdminPassword    string
-	DemoPartnerName  string
-	DemoPartnerEmail string
-	DemoPartnerPass  string
-	ReferralCodeSeed string
-	RunSeeder        bool
-	RunCleanup       bool
+	Port              string
+	DatabaseURL       string
+	JWTSecret         string
+	JWTExpiresIn      time.Duration
+	WebOrigin         string
+	WebOrigins        []string
+	ResendAPIKey      string
+	ResendFromEmail   string
+	AdminName         string
+	AdminUsername     string
+	AdminEmail        string
+	AdminPassword     string
+	DemoPartnerName   string
+	DemoPartnerEmail  string
+	DemoPartnerPass   string
+	ReferralCodeSeed  string
+	RunSeeder         bool
+	RunCleanup        bool
 	R2AccountID       string
 	R2AccessKeyID     string
 	R2SecretAccessKey string
@@ -44,6 +46,8 @@ func Load() Config {
 		JWTExpiresIn:      durationEnv("JWT_EXPIRES_IN", 24*time.Hour),
 		WebOrigin:         webOrigin,
 		WebOrigins:        originsEnv("WEB_ORIGIN", webOrigin),
+		ResendAPIKey:      env("RESEND_API_KEY", ""),
+		ResendFromEmail:   env("RESEND_FROM_EMAIL", ""),
 		AdminName:         env("ADMIN_NAME", "GiLabs Admin"),
 		AdminUsername:     strings.ToLower(env("ADMIN_USERNAME", "admin")),
 		AdminEmail:        strings.ToLower(env("ADMIN_EMAIL", "admin@gilabs.local")),
