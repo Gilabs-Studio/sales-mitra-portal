@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../app_state.dart';
+import '../knowledge_details.dart';
 import '../models.dart';
 import '../theme.dart';
 
@@ -63,7 +64,10 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
                     children: [
                       for (final article in state.articles)
-                        KnowledgeCard(article: article),
+                        KnowledgeCard(
+                          article: article,
+                          onTap: () => _openArticle(context, article),
+                        ),
                       const SizedBox(height: 12),
                       const Text(
                         'AI chatbot mitra',
@@ -187,49 +191,216 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
       if (mounted) setState(() => asking = false);
     }
   }
+
+  void _openArticle(BuildContext context, KnowledgeArticle article) {
+    showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: MitraColors.background,
+      builder: (_) => KnowledgeDetailSheet(article: article),
+    );
+  }
 }
 
 class KnowledgeCard extends StatelessWidget {
-  const KnowledgeCard({required this.article, super.key});
+  const KnowledgeCard({required this.article, required this.onTap, super.key});
+
+  final KnowledgeArticle article;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasDetail = getKnowledgeDetail(article) != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: MitraColors.card,
+          border: Border.all(color: MitraColors.border),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              article.category.toUpperCase(),
+              style: const TextStyle(
+                color: MitraColors.mutedForeground,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              article.title,
+              style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              article.content,
+              style: const TextStyle(
+                color: MitraColors.mutedForeground,
+                height: 1.45,
+              ),
+            ),
+            if (hasDetail) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Buka detail',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  color: MitraColors.foreground,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class KnowledgeDetailSheet extends StatelessWidget {
+  const KnowledgeDetailSheet({required this.article, super.key});
 
   final KnowledgeArticle article;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: MitraColors.card,
-        border: Border.all(color: MitraColors.border),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            article.category.toUpperCase(),
-            style: const TextStyle(
-              color: MitraColors.mutedForeground,
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
+    final detail = getKnowledgeDetail(article);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    article.category.toUpperCase(),
+                    style: const TextStyle(
+                      color: MitraColors.mutedForeground,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    article.title,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            article.title,
-            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            article.content,
-            style: const TextStyle(
-              color: MitraColors.mutedForeground,
-              height: 1.45,
+            IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close),
             ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          detail?.overview ?? article.content,
+          style: const TextStyle(
+            color: MitraColors.mutedForeground,
+            height: 1.45,
           ),
+        ),
+        for (final section
+            in detail?.sections ?? const <KnowledgeDetailSection>[]) ...[
+          const SizedBox(height: 22),
+          Text(
+            section.title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+          if (section.summary != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              section.summary!,
+              style: const TextStyle(
+                color: MitraColors.mutedForeground,
+                height: 1.4,
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          for (final item in section.items)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: MitraColors.card,
+                border: Border.all(color: MitraColors.border),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: ExpansionTile(
+                tilePadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 2,
+                ),
+                childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                shape: const Border(),
+                collapsedShape: const Border(),
+                title: Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: MitraColors.foreground,
+                  ),
+                ),
+                children: [
+                  if (item.summary != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text(
+                        item.summary!,
+                        style: const TextStyle(
+                          color: MitraColors.mutedForeground,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  for (final bullet in item.bullets)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            margin: const EdgeInsets.only(top: 7, right: 10),
+                            decoration: const BoxDecoration(
+                              color: MitraColors.foreground,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              bullet,
+                              style: const TextStyle(
+                                color: MitraColors.mutedForeground,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
         ],
-      ),
+      ],
     );
   }
 }
