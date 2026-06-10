@@ -27,12 +27,28 @@ export type AdminUser = {
 export type PartnerWithStats = {
   id: string;
   name: string;
+  username: string;
   email: string;
   role: Role;
   partnerCode: string;
+  isSuspended: boolean;
+  suspendedReason: string;
   createdAt: string;
   totalLeads: number;
   qualifiedLeads: number;
   wonLeads: number;
   rejectedLeads: number;
+};
+
+export type PartnerFilters = {
+  page?: number;
+  pageSize?: number;
+};
+
+export type PaginatedPartners = {
+  data: PartnerWithStats[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 };

@@ -4,10 +4,14 @@ import type {
   CreateAdminPayload,
   PartnerWithStats,
   UpdateUserSuspensionPayload,
+  PartnerFilters,
+  PaginatedPartners,
 } from "../types/admin.types";
 
-export async function listPartners() {
-  const response = await apiClient.get<ApiEnvelope<PartnerWithStats[]>>("/admin/partners");
+export async function listPartners(filters: PartnerFilters = {}) {
+  const response = await apiClient.get<ApiEnvelope<PaginatedPartners>>("/admin/partners", {
+    params: filters,
+  });
   return unwrapApiResponse(response.data);
 }
 

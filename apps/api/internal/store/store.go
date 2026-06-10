@@ -1141,10 +1141,16 @@ func (s *Store) GetAdminDashboard(ctx context.Context) (domain.AdminDashboard, e
 	}, nil
 }
 
-func (s *Store) ListPartnersWithStats(ctx context.Context) ([]domain.PartnerWithStats, error) {
+func (s *Store) ListPartnersWithStats(ctx context.Context, limit, offset int) ([]domain.PartnerWithStats, int, error) {
+	var total int
+	countQuery := `SELECT COUNT(*) FROM users WHERE role = 'partner'`
+	if err := s.db.QueryRowContext(ctx, countQuery).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT u.id, u.name, u.username, u.email, u.role, u.partner_code, u.created_at,
+		`SELECT u.id, u.name, u.username, u.email, u.role, u.partner_code, u.is_suspended, u.suspended_reason, u.created_at,
 			COUNT(l.id) AS total_leads,
 			COALESCE(SUM(CASE WHEN l.status = 'qualified' THEN 1 ELSE 0 END), 0) AS qualified_leads,
 			COALESCE(SUM(CASE WHEN l.status = 'won' THEN 1 ELSE 0 END), 0) AS won_leads,
@@ -1153,10 +1159,13 @@ func (s *Store) ListPartnersWithStats(ctx context.Context) ([]domain.PartnerWith
 		LEFT JOIN leads l ON l.partner_id = u.id
 		WHERE u.role = 'partner'
 		GROUP BY u.id
-		ORDER BY total_leads DESC, u.created_at DESC`,
+		ORDER BY total_leads DESC, u.created_at DESC
+		LIMIT ? OFFSET ?`,
+		limit,
+		offset,
 	)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -1164,6 +1173,7 @@ func (s *Store) ListPartnersWithStats(ctx context.Context) ([]domain.PartnerWith
 	for rows.Next() {
 		var partner domain.PartnerWithStats
 		var createdAt string
+		var isSuspended int
 		if err := rows.Scan(
 			&partner.ID,
 			&partner.Name,
@@ -1171,18 +1181,21 @@ func (s *Store) ListPartnersWithStats(ctx context.Context) ([]domain.PartnerWith
 			&partner.Email,
 			&partner.Role,
 			&partner.PartnerCode,
+			&isSuspended,
+			&partner.SuspendedReason,
 			&createdAt,
 			&partner.TotalLeads,
 			&partner.QualifiedLeads,
 			&partner.WonLeads,
 			&partner.RejectedLeads,
 		); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
+		partner.IsSuspended = intToBool(isSuspended)
 		partner.CreatedAt = parseTime(createdAt)
 		partners = append(partners, partner)
 	}
-	return partners, rows.Err()
+	return partners, total, rows.Err()
 }
 
 func (s *Store) ListLeadEvents(ctx context.Context, leadID string) ([]domain.LeadEvent, error) {

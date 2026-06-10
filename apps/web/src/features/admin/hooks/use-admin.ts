@@ -2,11 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createAdmin, listAdmins, listPartners, updateUserSuspension } from "../services/admin.service";
+import type { PartnerFilters } from "../types/admin.types";
 
-export function useAdminPartners() {
+export function useAdminPartners(filters: PartnerFilters = {}) {
   return useQuery({
-    queryKey: ["admin", "partners"],
-    queryFn: listPartners,
+    queryKey: ["admin", "partners", filters],
+    queryFn: () => listPartners(filters),
   });
 }
 

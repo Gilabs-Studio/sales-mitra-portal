@@ -406,12 +406,31 @@ func (h Handler) updateLeadStatus(c *gin.Context) {
 }
 
 func (h Handler) adminPartners(c *gin.Context) {
-	partners, err := h.store.ListPartnersWithStats(c.Request.Context())
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 20
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+
+	limit := pageSize
+	offset := (page - 1) * pageSize
+
+	partners, total, err := h.store.ListPartnersWithStats(c.Request.Context(), limit, offset)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	httpx.OK(c, "Daftar mitra", partners)
+
+	httpx.OK(c, "Daftar mitra", gin.H{
+		"data":       partners,
+		"total":      total,
+		"page":       page,
+		"pageSize":   pageSize,
+		"totalPages": ceilDiv(total, pageSize),
+	})
 }
 
 func (h Handler) adminServices(c *gin.Context) {

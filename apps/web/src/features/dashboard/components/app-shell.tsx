@@ -33,10 +33,11 @@ const adminNav: NavItem[] = [
   { href: "/admin/leads", label: "Lead" },
   { href: "/admin/chat", label: "Chat" },
   { href: "/admin/services", label: "Layanan" },
+  { href: "/admin/partners", label: "Mitra" },
   { href: "/admin/admins", label: "Admin", superAdminOnly: true },
 ];
 
-export function AppShell({ user, children, noPadding }: AppShellProps) {
+export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>) {
   const pathname = usePathname();
   const logout = useLogout();
   const adminScope = isAdminRole(user.role);
@@ -49,7 +50,7 @@ export function AppShell({ user, children, noPadding }: AppShellProps) {
   const [profileOpen, setProfileOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
-  const totalUnread = unreadQuery.data?.data.reduce((acc, lead) => acc + lead.unreadCount, 0) ?? 0;
+  const totalUnread = unreadQuery.data?.data?.reduce((acc, lead) => acc + lead.unreadCount, 0) ?? 0;
 
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

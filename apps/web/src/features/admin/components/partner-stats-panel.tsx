@@ -3,13 +3,13 @@
 import { useAdminPartners } from "../hooks/use-admin";
 
 export function PartnerStatsPanel() {
-  const partners = useAdminPartners();
+  const partners = useAdminPartners({ page: 1, pageSize: 5 });
 
   return (
     <section className="rounded-lg border border-border bg-card p-5">
       <h2 className="text-lg font-extrabold text-foreground">Mitra aktif</h2>
       <div className="mt-4 space-y-3">
-        {partners.data?.map((partner) => (
+        {partners.data?.data?.map((partner) => (
           <div key={partner.id} className="rounded-lg border border-border bg-secondary p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -25,7 +25,12 @@ export function PartnerStatsPanel() {
             </div>
           </div>
         ))}
-        {partners.data?.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada mitra</p> : null}
+        {partners.isLoading && (
+          <p className="text-sm text-muted-foreground">Memuat data mitra...</p>
+        )}
+        {!partners.isLoading && (partners.data?.data?.length ?? 0) === 0 ? (
+          <p className="text-sm text-muted-foreground">Belum ada mitra</p>
+        ) : null}
       </div>
     </section>
   );
