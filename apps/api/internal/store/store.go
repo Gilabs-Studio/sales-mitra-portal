@@ -335,33 +335,43 @@ func (s *Store) SeedKnowledge(ctx context.Context) error {
 			ID:       "knw-company-profile",
 			Title:    "Company Profile",
 			Category: "Layanan",
-			Content:  "Company Profile cocok untuk bisnis yang membutuhkan landing page profil, kredibilitas brand, showcase layanan, dan funnel kontak. Budget minimal yang direkomendasikan adalah Rp10 juta.",
+			Content:  "Company Profile membantu klien membangun kredibilitas digital, menjelaskan positioning, menampilkan layanan/produk, dan membuka funnel kontak yang lebih siap dikonversi. Sales perlu menggali target audiens, pembeda bisnis, trust builder, CTA utama, aset konten, dan kebutuhan maintenance.",
 		},
 		{
 			ID:       "knw-website-app",
 			Title:    "Website dan Aplikasi Sederhana",
 			Category: "Layanan",
-			Content:  "Website atau aplikasi sederhana mencakup portal ringan, katalog, booking, dashboard dasar, dan integrasi standar. Lead ideal memiliki budget mulai Rp15 juta.",
+			Content:  "Website atau aplikasi sederhana mencakup portal ringan, katalog, booking, dashboard dasar, MVP, workflow internal, dan integrasi standar. Lead ideal mulai Rp15 juta, dengan scope, user role, alur approval, data utama, dan prioritas fase pertama yang cukup jelas.",
 		},
 		{
 			ID:       "knw-custom-software",
 			Title:    "Custom Software, ERP, dan Sistem Kompleks",
 			Category: "Discovery",
-			Content:  "Custom software membutuhkan discovery kebutuhan, proses bisnis, stakeholder, integrasi, timeline, dan risiko. Jika budget belum jelas, mitra perlu melengkapi ringkasan kebutuhan proyek.",
+			Content:  "Custom software, ERP, dan sistem kompleks wajib melalui discovery untuk memetakan masalah bisnis, proses as-is/to-be, stakeholder, modul prioritas, integrasi, migrasi data, timeline, risiko, dan budget range. Jika budget belum jelas, mitra perlu melengkapi ringkasan kebutuhan proyek.",
 		},
 		{
 			ID:       "knw-salesview",
 			Title:    "SalesView",
 			Category: "Produk",
-			Content:  "SalesView membantu tim sales memonitor pipeline, aktivitas prospek, dan referral code. Mitra dapat memakai referral code untuk tracking akuisisi produk.",
+			Content:  "SalesView adalah suite modular untuk POS, CRM, ERP, HR, Finance, pipeline sales, dan referral tracking. Mitra dapat memulai percakapan dari pain point operasional paling terasa lalu menawarkan modul yang paling relevan sebagai langkah pertama.",
+		},
+		{
+			ID:       "knw-sop-software-development",
+			Title:    "SOP Standard Software Development",
+			Category: "SOP",
+			Content:  "SOP development GiLabs menjaga kualitas dari discovery sampai live: requirement alignment, scope, desain flow/UX, sprint development, code review, QA/testing, staging, UAT, deployment, handover, dokumentasi, dan maintenance. Untuk sales, SOP ini adalah bukti bahwa proyek punya kontrol kualitas dan risiko yang jelas.",
 		},
 	}
 
 	for _, article := range articles {
 		if _, err := s.db.ExecContext(
 			ctx,
-			`INSERT OR IGNORE INTO knowledge_articles (id, title, category, content, created_at)
-			 VALUES (?, ?, ?, ?, ?)`,
+			`INSERT INTO knowledge_articles (id, title, category, content, created_at)
+			 VALUES (?, ?, ?, ?, ?)
+			 ON CONFLICT(id) DO UPDATE SET
+				title = excluded.title,
+				category = excluded.category,
+				content = excluded.content`,
 			article.ID,
 			article.Title,
 			article.Category,

@@ -17,7 +17,7 @@ export const useChatStore = create<ChatState>((set) => ({
     {
       id: "welcome",
       role: "assistant",
-      content: "Silakan tanya soal layanan GiLabs, budget minimum, referral code, atau SalesView.",
+      content: "Silakan tanya soal layanan GiLabs, SOP development, discovery, pricing, atau angle closing untuk klien.",
     },
   ],
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
@@ -27,7 +27,7 @@ export const useChatStore = create<ChatState>((set) => ({
         {
           id: "welcome",
           role: "assistant",
-          content: "Silakan tanya soal layanan GiLabs, budget minimum, referral code, atau SalesView.",
+          content: "Silakan tanya soal layanan GiLabs, SOP development, discovery, pricing, atau angle closing untuk klien.",
         },
       ],
     }),

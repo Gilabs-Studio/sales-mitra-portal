@@ -19,6 +19,8 @@ Default auth dibuat oleh seeder dari env `ADMIN_USERNAME`, `ADMIN_EMAIL`, dan `A
 
 Demo mitra opsional dibuat jika `DEMO_PARTNER_EMAIL` dan `DEMO_PARTNER_PASSWORD` tersedia di env
 
+AI product knowledge untuk web dan mobile berjalan lewat backend. Isi `CEREBRAS_API_KEY` di `apps/api/.env`; jangan menaruh secret Cerebras di env web atau mobile.
+
 Jika binary `go` dari Snap bermasalah, jalankan API dengan path langsung:
 
 ```bash

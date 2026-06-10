@@ -28,7 +28,7 @@ func main() {
 	notificationService := service.NewNotificationService(cfg)
 	authService := service.NewAuthService(repository, cfg, notificationService)
 	leadService := service.NewLeadService(repository, cfg, notificationService)
-	knowledgeService := service.NewKnowledgeService(repository)
+	knowledgeService := service.NewKnowledgeService(repository, cfg)
 	serviceCatalogService := service.NewServiceCatalogService(repository)
 
 	if err := seeder.New(repository, authService).Run(context.Background(), cfg); err != nil {

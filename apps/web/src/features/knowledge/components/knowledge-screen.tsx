@@ -27,7 +27,7 @@ export function KnowledgeScreen() {
           <div>
             <h1 className="text-3xl font-extrabold text-foreground">Product knowledge center</h1>
             <p className="mt-2 max-w-2xl font-serif text-lg leading-7 text-muted-foreground">
-              Materi ringkas agar mitra dapat menjelaskan layanan, budget minimum, dan kebutuhan discovery.
+              Materi sales untuk menjelaskan layanan, SOP development, discovery, kualitas delivery, dan angle closing.
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -68,7 +68,7 @@ export function KnowledgeScreen() {
           </div>
           <form onSubmit={chatbot.onSubmit} className="mt-4 space-y-2">
             <div className="flex gap-2">
-              <Input placeholder="Tanya soal pricing, layanan, referral..." {...register("question")} />
+              <Input placeholder="Tanya SOP, pricing, layanan, closing..." {...register("question")} />
               <Button type="submit" isLoading={chatbot.isLoading} aria-label="Kirim pertanyaan">
                 <Send className="h-4 w-4" aria-hidden="true" />
               </Button>

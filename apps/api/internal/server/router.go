@@ -283,7 +283,7 @@ func (h Handler) askChatbot(c *gin.Context) {
 		return
 	}
 
-	answer, err := h.knowledgeService.Ask(c.Request.Context(), input)
+	answer, err := h.knowledgeService.Ask(c.Request.Context(), currentUser(c), input)
 	if err != nil {
 		httpx.Fail(c, err)
 		return

@@ -18,7 +18,8 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
   final List<KnowledgeChatMessage> messages = [
     const KnowledgeChatMessage(
       role: 'bot',
-      text: 'Tanya soal pricing, layanan, referral, atau kebutuhan discovery.',
+      text:
+          'Tanya soal layanan GiLabs, SOP development, discovery, pricing, atau angle closing untuk klien.',
     ),
   ];
   bool asking = false;
@@ -137,7 +138,7 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
                           child: TextField(
                             controller: question,
                             decoration: const InputDecoration(
-                              hintText: 'Tanya pricing, layanan, referral...',
+                              hintText: 'Tanya SOP, pricing, layanan...',
                               prefixIcon: Icon(Icons.psychology_outlined),
                             ),
                           ),

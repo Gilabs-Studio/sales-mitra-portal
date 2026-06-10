@@ -32,6 +32,11 @@ type Config struct {
 	R2SecretAccessKey string
 	R2BucketName      string
 	R2PublicURL       string
+	CerebrasBaseURL   string
+	CerebrasAPIKey    string
+	CerebrasModel     string
+	CerebrasMaxTokens int
+	CerebrasTimeout   time.Duration
 }
 
 func Load() Config {
@@ -63,6 +68,11 @@ func Load() Config {
 		R2SecretAccessKey: env("CF_R2_SECRET_ACCESS_KEY", ""),
 		R2BucketName:      env("CF_R2_BUCKET_NAME", ""),
 		R2PublicURL:       env("CF_R2_PUBLIC_URL", ""),
+		CerebrasBaseURL:   env("CEREBRAS_BASE_URL", "https://api.cerebras.ai"),
+		CerebrasAPIKey:    env("CEREBRAS_API_KEY", ""),
+		CerebrasModel:     env("CEREBRAS_MODEL", "gpt-oss-120b"),
+		CerebrasMaxTokens: intEnv("CEREBRAS_MAX_COMPLETION_TOKENS", 520),
+		CerebrasTimeout:   durationEnv("CEREBRAS_TIMEOUT", 8*time.Second),
 	}
 }
 
@@ -101,6 +111,25 @@ func durationEnv(key string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return duration
+}
+
+func intEnv(key string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+
+	parsed := 0
+	for _, char := range value {
+		if char < '0' || char > '9' {
+			return fallback
+		}
+		parsed = parsed*10 + int(char-'0')
+	}
+	if parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }
 
 func boolEnv(key string, fallback bool) bool {
