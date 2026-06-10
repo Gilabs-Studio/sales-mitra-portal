@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ArrowRight, Download, Smartphone, TrendingUp, Zap, Shield } from "lucide-react";
 import { Link } from "@/i18n/routing";
+import { getPartnerResources } from "@/features/resources/resources";
 import {
   Card,
   CardHeader,
@@ -19,6 +20,7 @@ export default async function HomePage({ params }: PageProps) {
   const { locale } = await params;
   const isEn = locale === "en";
   const mobileDownloadUrl = process.env.NEXT_PUBLIC_MOBILE_APP_DOWNLOAD_URL;
+  const resources = getPartnerResources(locale);
 
   const t = {
     /* ── Nav ─────────────────────────────────────────────── */
@@ -113,28 +115,6 @@ export default async function HomePage({ params }: PageProps) {
     dirIntro: isEn
       ? "Everything you need to start referring and earning — right here"
       : "Semua yang kamu butuhkan untuk mulai referral dan dapat komisi — ada di sini",
-    dir: [
-      {
-        title: isEn ? "Partnership Guide & Commission Calculator" : "Panduan Kemitraan & Kalkulator Komisi",
-        tag:   isEn ? "Documentation" : "Dokumentasi",
-      },
-      {
-        title: isEn ? "Case Study: CRM System for PT Nusa" : "Studi Kasus: Sistem CRM PT Nusa",
-        tag:   isEn ? "Case Study" : "Studi Kasus",
-      },
-      {
-        title: isEn ? "Discovery Requirements Form (for your referral)" : "Formulir Discovery Requirement (untuk referralmu)",
-        tag:   isEn ? "Partner Tools" : "Alat Mitra",
-      },
-      {
-        title: isEn ? "Lead Privacy & Data Security Policy" : "Kebijakan Privasi & Keamanan Data Lead",
-        tag:   isEn ? "Compliance" : "Kepatuhan",
-      },
-      {
-        title: isEn ? "GiLabs Partnership Terms & Conditions" : "Syarat dan Ketentuan Kemitraan GiLabs",
-        tag:   isEn ? "Legal" : "Legalitas",
-      },
-    ],
   };
 
   /* ── Icons per value prop ───── */
@@ -433,9 +413,10 @@ export default async function HomePage({ params }: PageProps) {
           </div>
 
           <div className="lg:col-span-8">
-            {t.dir.map(({ title, tag }) => (
-              <div
-                key={title}
+            {resources.map(({ slug, title, tag }) => (
+              <Link
+                key={slug}
+                href={`/resources/${slug}`}
                 className="flex items-center justify-between py-5 border-b border-border/30 cursor-pointer group hover:opacity-80 transition-opacity"
               >
                 <span className="font-semibold text-base text-foreground group-hover:underline transition-all duration-200">
@@ -444,7 +425,7 @@ export default async function HomePage({ params }: PageProps) {
                 <span className="shrink-0 ml-4 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground bg-secondary px-2.5 py-1 rounded">
                   {tag}
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
