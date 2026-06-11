@@ -110,7 +110,7 @@ export function useSendMessage(leadId: string, role: "partner" | "admin") {
   });
 }
 
-export function useCreateLeadForm() {
+export function useCreateLeadForm(options?: { onSuccess?: () => void }) {
   const queryClient = useQueryClient();
   const form = useForm<LeadFormInputValues, unknown, LeadFormValues>({
     resolver: zodResolver(leadSchema),
@@ -131,6 +131,7 @@ export function useCreateLeadForm() {
     onSuccess: () => {
       form.reset();
       void queryClient.invalidateQueries({ queryKey: ["partner"] });
+      options?.onSuccess?.();
     },
   });
 
