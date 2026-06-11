@@ -77,7 +77,7 @@ func Open(databaseURL string) (*sql.DB, error) {
 		"PRAGMA journal_mode = WAL",
 		"PRAGMA busy_timeout = 10000", // 10s wait instead of instant fail
 		"PRAGMA foreign_keys = ON",
-		"PRAGMA cache_size = -8000",  // 8MB page cache
+		"PRAGMA cache_size = -8000", // 8MB page cache
 		"PRAGMA synchronous = NORMAL",
 	}
 	for _, p := range pragmas {
@@ -2036,6 +2036,34 @@ type ClientDashboardStats struct {
 	RecentActivity       []domain.AuditLog
 }
 
+const clientAuditLogScope = `
+WITH client_projects AS (
+	SELECT id
+	FROM projects
+	WHERE client_id = ?
+)
+`
+
+const clientAuditLogFilter = `
+(
+	(target_type = 'project' AND target_id IN (SELECT id FROM client_projects))
+	OR (target_type = 'project_progress' AND target_id IN (
+		SELECT id FROM project_progress WHERE project_id IN (SELECT id FROM client_projects)
+	))
+	OR (target_type = 'project_document' AND target_id IN (
+		SELECT id FROM project_documents WHERE project_id IN (SELECT id FROM client_projects)
+	))
+	OR (target_type IN ('maintenance_log', 'project_maintenance_log') AND target_id IN (
+		SELECT id FROM project_maintenance_logs WHERE project_id IN (SELECT id FROM client_projects)
+	))
+	OR (target_type IN ('project_maintenance', 'maintenance') AND target_id IN (
+		SELECT id FROM project_maintenance WHERE project_id IN (SELECT id FROM client_projects)
+	))
+	OR (target_type = 'invoice' AND target_id IN (
+		SELECT id FROM project_invoices WHERE project_id IN (SELECT id FROM client_projects)
+	))
+)`
+
 // GetClientDashboardStats fetches all dashboard aggregates for a client in 3 efficient
 // queries instead of N queries per project, eliminating the N+1 problem.
 func (s *Store) GetClientDashboardStats(ctx context.Context, clientID string) (ClientDashboardStats, error) {
@@ -2092,9 +2120,9 @@ func (s *Store) GetClientDashboardStats(ctx context.Context, clientID string) (C
 	// 3. Recent activity / audit logs (top 10 across all client projects)
 	aRows, err := s.db.QueryContext(
 		ctx,
-		`SELECT id, actor_id, actor_name, actor_role, action, target_type, target_id, details, created_at
+		clientAuditLogScope+`SELECT id, actor_id, actor_name, actor_role, action, target_type, target_id, details, created_at
 		 FROM audit_logs
-		 WHERE target_id IN (SELECT id FROM projects WHERE client_id = ?)
+		 WHERE `+clientAuditLogFilter+`
 		 ORDER BY created_at DESC
 		 LIMIT 10`,
 		clientID,
@@ -2636,9 +2664,9 @@ func (s *Store) ListClientNotifications(ctx context.Context, clientID string, li
 	var total int
 	err := s.db.QueryRowContext(
 		ctx,
-		`SELECT COUNT(*)
+		clientAuditLogScope+`SELECT COUNT(*)
 		 FROM audit_logs
-		 WHERE target_id IN (SELECT id FROM projects WHERE client_id = ?)`,
+		 WHERE `+clientAuditLogFilter,
 		clientID,
 	).Scan(&total)
 	if err != nil {
@@ -2647,9 +2675,9 @@ func (s *Store) ListClientNotifications(ctx context.Context, clientID string, li
 
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT id, actor_id, actor_name, actor_role, action, target_type, target_id, details, created_at
+		clientAuditLogScope+`SELECT id, actor_id, actor_name, actor_role, action, target_type, target_id, details, created_at
 		 FROM audit_logs
-		 WHERE target_id IN (SELECT id FROM projects WHERE client_id = ?)
+		 WHERE `+clientAuditLogFilter+`
 		 ORDER BY created_at DESC
 		 LIMIT ? OFFSET ?`,
 		clientID,

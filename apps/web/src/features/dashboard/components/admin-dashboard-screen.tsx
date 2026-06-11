@@ -7,6 +7,7 @@ import { AppShell } from "./app-shell";
 import { MetricGrid } from "./metric-grid";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
 import { PartnerStatsPanel } from "@/features/admin/components/partner-stats-panel";
+import type { AdminMaintenanceLog } from "@/features/admin/types/admin.types";
 import { LeadTable } from "@/features/leads/components/lead-table";
 import { useAdminDashboard } from "../hooks/use-dashboard";
 import { useAllMaintenanceLogs, useUpdateMaintenanceLogStatus } from "@/features/admin/hooks/use-admin-projects";
@@ -76,7 +77,7 @@ export function AdminDashboardScreen() {
               </p>
             </div>
             <span className="rounded bg-teal-500/10 px-2 py-0.5 text-[10px] font-bold text-teal-600">
-              {maintLogsQuery.data?.filter((l: any) => l.status !== "completed").length ?? 0} Aktif
+              {maintLogsQuery.data?.filter((log) => log.status !== "completed").length ?? 0} Aktif
             </span>
           </div>
 
@@ -96,7 +97,7 @@ export function AdminDashboardScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {maintLogsQuery.data.map((log: any) => (
+                  {maintLogsQuery.data.map((log: AdminMaintenanceLog) => (
                     <tr
                       key={log.id}
                       className="align-middle hover:bg-secondary/40 transition-colors"
