@@ -251,3 +251,70 @@ func normalizeEmails(values []string) []string {
 	slices.Sort(emails)
 	return emails
 }
+
+func (s *NotificationService) NotifyClientProjectProgress(ctx context.Context, recipient string, projectName string, title string, status string, percentage int, notes string, detailURL string) {
+	text := fmt.Sprintf("Progres project %s telah diperbarui.\n\nMilestone: %s\nStatus: %s\nPersentase: %d%%\nCatatan: %s\n\nBuka portal: %s", projectName, title, status, percentage, notes, detailURL)
+	htmlBody := fmt.Sprintf("<p>Progres project <strong>%s</strong> telah diperbarui.</p><p><strong>Milestone:</strong> %s<br/><strong>Status:</strong> %s<br/><strong>Persentase:</strong> %d%%</p>", html.EscapeString(projectName), html.EscapeString(title), html.EscapeString(status), percentage)
+	if notes != "" {
+		htmlBody += fmt.Sprintf("<p><strong>Catatan:</strong><br/>%s</p>", html.EscapeString(notes))
+	}
+	htmlBody += fmt.Sprintf("<p><a href=\"%s\">Buka detail project</a></p>", html.EscapeString(detailURL))
+
+	s.sendAsync(ctx, []string{recipient}, notificationEmail{
+		Subject: fmt.Sprintf("Progress Project Update: %s", projectName),
+		Text:    text,
+		HTML:    htmlBody,
+	})
+}
+
+func (s *NotificationService) NotifyClientProjectStatus(ctx context.Context, recipient string, projectName string, status string, detailURL string) {
+	text := fmt.Sprintf("Status project %s telah diperbarui menjadi %s.\n\nBuka portal: %s", projectName, status, detailURL)
+	htmlBody := fmt.Sprintf("<p>Status project <strong>%s</strong> telah diperbarui menjadi <strong>%s</strong>.</p><p><a href=\"%s\">Buka detail project</a></p>", html.EscapeString(projectName), html.EscapeString(status), html.EscapeString(detailURL))
+
+	s.sendAsync(ctx, []string{recipient}, notificationEmail{
+		Subject: fmt.Sprintf("Project Status Updated: %s", projectName),
+		Text:    text,
+		HTML:    htmlBody,
+	})
+}
+
+func (s *NotificationService) NotifyClientNewDocument(ctx context.Context, recipient string, projectName string, docTitle string, detailURL string) {
+	text := fmt.Sprintf("Dokumen baru telah diunggah untuk project %s.\n\nNama Dokumen: %s\n\nBuka portal: %s", projectName, docTitle, detailURL)
+	htmlBody := fmt.Sprintf("<p>Dokumen baru telah diunggah untuk project <strong>%s</strong>.</p><p><strong>Nama Dokumen:</strong> %s</p><p><a href=\"%s\">Buka detail project</a></p>", html.EscapeString(projectName), html.EscapeString(docTitle), html.EscapeString(detailURL))
+
+	s.sendAsync(ctx, []string{recipient}, notificationEmail{
+		Subject: fmt.Sprintf("New Document Uploaded: %s", projectName),
+		Text:    text,
+		HTML:    htmlBody,
+	})
+}
+
+func (s *NotificationService) NotifyClientMaintenanceUpdate(ctx context.Context, recipient string, projectName string, desc string, status string, detailURL string) {
+	text := fmt.Sprintf("Service maintenance untuk project %s telah diperbarui.\n\nDeskripsi: %s\nStatus: %s\n\nBuka portal: %s", projectName, desc, status, detailURL)
+	htmlBody := fmt.Sprintf("<p>Service maintenance untuk project <strong>%s</strong> telah diperbarui.</p><p><strong>Deskripsi:</strong> %s<br/><strong>Status:</strong> %s</p><p><a href=\"%s\">Buka detail project</a></p>", html.EscapeString(projectName), html.EscapeString(desc), html.EscapeString(status), html.EscapeString(detailURL))
+
+	s.sendAsync(ctx, []string{recipient}, notificationEmail{
+		Subject: fmt.Sprintf("Maintenance Status Updated: %s", projectName),
+		Text:    text,
+		HTML:    htmlBody,
+	})
+}
+
+func (s *NotificationService) NotifyClientNewInvoice(ctx context.Context, recipient string, projectName string, invoiceNumber string, amount int64, status string, detailURL string) {
+	text := fmt.Sprintf("Invoice baru telah diterbitkan untuk project %s.\n\nNomor Invoice: %s\nNominal: %d\nStatus: %s\n\nBuka portal: %s", projectName, invoiceNumber, amount, status, detailURL)
+	htmlBody := fmt.Sprintf("<p>Invoice baru telah diterbitkan untuk project <strong>%s</strong>.</p><p><strong>Nomor Invoice:</strong> %s<br/><strong>Nominal:</strong> Rp%d<br/><strong>Status:</strong> %s</p><p><a href=\"%s\">Buka detail billing</a></p>", html.EscapeString(projectName), html.EscapeString(invoiceNumber), amount, html.EscapeString(status), html.EscapeString(detailURL))
+
+	s.sendAsync(ctx, []string{recipient}, notificationEmail{
+		Subject: fmt.Sprintf("New Invoice Generated: %s", projectName),
+		Text:    text,
+		HTML:    htmlBody,
+	})
+}
+
+func (s *NotificationService) ClientProjectURL(projectID string) string {
+	return joinURL(s.appBaseURL, "/client/projects/"+projectID)
+}
+
+func (s *NotificationService) ClientInvoiceURL(projectID string) string {
+	return joinURL(s.appBaseURL, "/client/projects/"+projectID+"?tab=invoice")
+}

@@ -8,6 +8,7 @@ const (
 	RoleSuperAdmin Role = "super_admin"
 	RoleAdmin      Role = "admin"
 	RolePartner    Role = "partner"
+	RoleClient     Role = "client"
 )
 
 func (r Role) IsAdminScope() bool {
@@ -15,7 +16,7 @@ func (r Role) IsAdminScope() bool {
 }
 
 func (r Role) IsValid() bool {
-	return r == RoleSuperAdmin || r == RoleAdmin || r == RolePartner
+	return r == RoleSuperAdmin || r == RoleAdmin || r == RolePartner || r == RoleClient
 }
 
 func (r Role) OperationalRole() Role {
@@ -198,4 +199,122 @@ type PayoutSummary struct {
 	PartnerPayout       int64   `json:"partnerPayout"`
 	PayoutProgress      float64 `json:"payoutProgress"`
 	RemainingCommission int64   `json:"remainingCommission"`
+}
+
+type ProjectStatus string
+
+const (
+	ProjectStatusDiscovery   ProjectStatus = "discovery"
+	ProjectStatusPlanning    ProjectStatus = "planning"
+	ProjectStatusDevelopment ProjectStatus = "development"
+	ProjectStatusTesting     ProjectStatus = "testing"
+	ProjectStatusDeployment  ProjectStatus = "deployment"
+	ProjectStatusCompleted   ProjectStatus = "completed"
+	ProjectStatusMaintenance ProjectStatus = "maintenance"
+)
+
+type Project struct {
+	ID            string        `json:"id"`
+	ClientID      string        `json:"clientId"`
+	ClientName    string        `json:"clientName,omitempty"`
+	ClientEmail   string        `json:"clientEmail,omitempty"`
+	Name          string        `json:"name"`
+	Description   string        `json:"description"`
+	PICName       string        `json:"picName"`
+	PICContact    string        `json:"picContact"`
+	StartDate     string        `json:"startDate"`
+	TargetEndDate string        `json:"targetEndDate"`
+	Status        ProjectStatus `json:"status"`
+	WebsiteURL    string        `json:"websiteUrl"`
+	StagingURL    string        `json:"stagingUrl"`
+	Credentials   string        `json:"credentials"`
+	Documentation string        `json:"documentation"`
+	CreatedAt     time.Time     `json:"createdAt"`
+	UpdatedAt     time.Time     `json:"updatedAt"`
+}
+
+type ProgressStatus string
+
+const (
+	ProgressStatusPending    ProgressStatus = "pending"
+	ProgressStatusInProgress ProgressStatus = "in_progress"
+	ProgressStatusCompleted  ProgressStatus = "completed"
+)
+
+type ProjectProgress struct {
+	ID          string         `json:"id"`
+	ProjectID   string         `json:"projectId"`
+	Title       string         `json:"title"`
+	Status      ProgressStatus `json:"status"`
+	Percentage  int            `json:"percentage"`
+	UpdateDate  string         `json:"updateDate"`
+	Notes       string         `json:"notes"`
+	DocumentURL string         `json:"documentUrl"`
+	CreatedAt   time.Time      `json:"createdAt"`
+}
+
+type ProjectDocument struct {
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"projectId"`
+	Title       string    `json:"title"`
+	DocumentURL string    `json:"documentUrl"`
+	UploadedAt  time.Time `json:"uploadedAt"`
+}
+
+type ProjectMaintenance struct {
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"projectId"`
+	PackageName string    `json:"packageName"`
+	StartDate   string    `json:"startDate"`
+	EndDate     string    `json:"endDate"`
+	QuotaLimit  int       `json:"quotaLimit"`
+	QuotaUsed   int       `json:"quotaUsed"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+type MaintenanceLog struct {
+	ID          string         `json:"id"`
+	ProjectID   string         `json:"projectId"`
+	RequestDate string         `json:"requestDate"`
+	Description string         `json:"description"`
+	Status      ProgressStatus `json:"status"`
+	PICName     string         `json:"picName"`
+	CreatedAt   time.Time      `json:"createdAt"`
+}
+
+type InvoiceStatus string
+
+const (
+	InvoiceStatusDraft          InvoiceStatus = "draft"
+	InvoiceStatusSent           InvoiceStatus = "sent"
+	InvoiceStatusWaitingPayment InvoiceStatus = "waiting_payment"
+	InvoiceStatusPaid           InvoiceStatus = "paid"
+	InvoiceStatusOverdue        InvoiceStatus = "overdue"
+)
+
+type ProjectInvoice struct {
+	ID            string        `json:"id"`
+	ProjectID     string        `json:"projectId"`
+	ProjectName   string        `json:"projectName,omitempty"`
+	InvoiceNumber string        `json:"invoiceNumber"`
+	Amount        int64         `json:"amount"`
+	Status        InvoiceStatus `json:"status"`
+	IssueDate     string        `json:"issueDate"`
+	DueDate       string        `json:"dueDate"`
+	DocumentURL   string        `json:"documentUrl"`
+	CreatedAt     time.Time     `json:"createdAt"`
+	UpdatedAt     time.Time     `json:"updatedAt"`
+}
+
+type AuditLog struct {
+	ID         string    `json:"id"`
+	ActorID    string    `json:"actorId"`
+	ActorName  string    `json:"actorName"`
+	ActorRole  string    `json:"actorRole"`
+	Action     string    `json:"action"`
+	TargetType string    `json:"targetType"`
+	TargetID   string    `json:"targetId"`
+	Details    string    `json:"details"`
+	CreatedAt  time.Time `json:"createdAt"`
 }

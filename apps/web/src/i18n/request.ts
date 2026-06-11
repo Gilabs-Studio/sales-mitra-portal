@@ -14,6 +14,8 @@ import { adminEn } from "@/features/admin/i18n/en";
 import { adminId } from "@/features/admin/i18n/id";
 import { servicesEn } from "@/features/services/i18n/en";
 import { servicesId } from "@/features/services/i18n/id";
+import { clientEn } from "@/features/client/i18n/en";
+import { clientId } from "@/features/client/i18n/id";
 
 const messages = {
   en: {
@@ -24,6 +26,7 @@ const messages = {
     knowledge: knowledgeEn,
     admin: adminEn,
     services: servicesEn,
+    client: clientEn,
   },
   id: {
     ...globalId,
@@ -33,6 +36,7 @@ const messages = {
     knowledge: knowledgeId,
     admin: adminId,
     services: servicesId,
+    client: clientId,
   },
 };
 
