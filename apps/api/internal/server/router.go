@@ -21,6 +21,7 @@ import (
 const currentUserKey = "currentUser"
 
 type Handler struct {
+	cfg              config.Config
 	store            *store.Store
 	authService      *service.AuthService
 	leadService      *service.LeadService
@@ -28,6 +29,47 @@ type Handler struct {
 	catalogService   *service.ServiceCatalogService
 	uploadService    *service.UploadService
 	clientService    *service.ClientProjectService
+}
+
+func (h Handler) normalizeAssetURL(raw string) string {
+	if raw == "" || h.cfg.R2PublicURL == "" {
+		return raw
+	}
+
+	base, err := url.Parse(strings.TrimRight(h.cfg.R2PublicURL, "/"))
+	if err != nil {
+		return raw
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" || !strings.HasSuffix(parsed.Host, ".r2.dev") {
+		return raw
+	}
+
+	parsed.Scheme = base.Scheme
+	parsed.Host = base.Host
+	return parsed.String()
+}
+
+func (h Handler) normalizeProjectProgress(progress []domain.ProjectProgress) []domain.ProjectProgress {
+	for i := range progress {
+		progress[i].DocumentURL = h.normalizeAssetURL(progress[i].DocumentURL)
+	}
+	return progress
+}
+
+func (h Handler) normalizeProjectDocuments(docs []domain.ProjectDocument) []domain.ProjectDocument {
+	for i := range docs {
+		docs[i].DocumentURL = h.normalizeAssetURL(docs[i].DocumentURL)
+	}
+	return docs
+}
+
+func (h Handler) normalizeProjectInvoices(invoices []domain.ProjectInvoice) []domain.ProjectInvoice {
+	for i := range invoices {
+		invoices[i].DocumentURL = h.normalizeAssetURL(invoices[i].DocumentURL)
+	}
+	return invoices
 }
 
 func NewRouter(
@@ -61,6 +103,7 @@ func NewRouter(
 	}))
 
 	handler := Handler{
+		cfg:              cfg,
 		store:            repository,
 		authService:      authService,
 		leadService:      leadService,
@@ -825,7 +868,11 @@ func (h Handler) createPayout(c *gin.Context) {
 		return
 	}
 
-	evidenceURL, err := h.uploadService.UploadEvidence(c.Request.Context(), file)
+	evidenceURL, err := h.uploadService.UploadEvidence(c.Request.Context(), file, service.UploadPathOptions{
+		ClientID: lead.PartnerID,
+		ProjectID: leadID,
+		Category: "payouts",
+	})
 	if err != nil {
 		httpx.Fail(c, httpx.Validation("Gagal mengunggah bukti bayar", err.Error()))
 		return
@@ -1010,11 +1057,11 @@ func (h Handler) adminProjectDetail(c *gin.Context) {
 
 	httpx.OK(c, "Detail project", gin.H{
 		"project":     project,
-		"progress":    progress,
-		"documents":   docs,
+		"progress":    h.normalizeProjectProgress(progress),
+		"documents":   h.normalizeProjectDocuments(docs),
 		"maintenance": maintList,
 		"maintLogs":   maintLogs,
-		"invoices":    invoices,
+		"invoices":    h.normalizeProjectInvoices(invoices),
 		"auditLogs":   auditLogs,
 	})
 }
@@ -1313,7 +1360,7 @@ func (h Handler) clientProjectProgress(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	httpx.OK(c, "Progres project", progress)
+	httpx.OK(c, "Progres project", h.normalizeProjectProgress(progress))
 }
 
 func (h Handler) clientProjectMaintenance(c *gin.Context) {
@@ -1385,7 +1432,7 @@ func (h Handler) clientProjectInvoices(c *gin.Context) {
 		}
 	}
 
-	httpx.OK(c, "Invoice project", clientInvoices)
+	httpx.OK(c, "Invoice project", h.normalizeProjectInvoices(clientInvoices))
 }
 
 func (h Handler) clientProjectDocuments(c *gin.Context) {
@@ -1406,7 +1453,7 @@ func (h Handler) clientProjectDocuments(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	httpx.OK(c, "Dokumen project", docs)
+	httpx.OK(c, "Dokumen project", h.normalizeProjectDocuments(docs))
 }
 
 func (h Handler) clientProjectReports(c *gin.Context) {
@@ -1437,10 +1484,10 @@ func (h Handler) clientProjectReports(c *gin.Context) {
 
 	httpx.OK(c, "Report data project", gin.H{
 		"project":     project,
-		"progress":    progress,
+		"progress":    h.normalizeProjectProgress(progress),
 		"maintenance": maintList,
 		"maintLogs":   maintLogs,
-		"invoices":    clientInvoices,
+		"invoices":    h.normalizeProjectInvoices(clientInvoices),
 		"history":     auditLogs,
 	})
 }
@@ -1493,7 +1540,11 @@ func (h Handler) adminUploadFile(c *gin.Context) {
 		return
 	}
 
-	url, err := h.uploadService.UploadFile(c.Request.Context(), file)
+	url, err := h.uploadService.UploadFile(c.Request.Context(), file, service.UploadPathOptions{
+		ClientID:  c.PostForm("clientId"),
+		ProjectID: c.PostForm("projectId"),
+		Category:  c.DefaultPostForm("category", "documents"),
+	})
 	if err != nil {
 		httpx.Fail(c, httpx.BadRequest("Gagal mengunggah file", err.Error()))
 		return

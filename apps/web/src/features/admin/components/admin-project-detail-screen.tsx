@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   ArrowLeft,
+  CalendarDays,
   Settings,
   Clock,
   Layers,
@@ -42,11 +43,14 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileUpload } from "@/components/ui/file-upload";
+import { resolveAssetUrl } from "@/lib/asset-url";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type {
   MaintenanceLog,
@@ -67,6 +71,27 @@ type AdminProjectDetailData = {
   maintLogs?: MaintenanceLog[];
   invoices?: ProjectInvoice[];
 };
+
+function formatDateInput(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function parseDateInput(value: string) {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+}
+
+function formatDateLabel(value: string) {
+  const parsed = parseDateInput(value);
+  if (!parsed) return "Pilih tanggal";
+  return parsed.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 export function AdminProjectDetailScreen({ projectId }: { readonly projectId: string }) {
   const auth = useAuthGuard("admin");
@@ -145,8 +170,31 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
   const [invIssueDate, setInvIssueDate] = React.useState("");
   const [invDueDate, setInvDueDate] = React.useState("");
   const [invDoc, setInvDoc] = React.useState("");
+  const [showIssueCalendar, setShowIssueCalendar] = React.useState(false);
+  const [showDueCalendar, setShowDueCalendar] = React.useState(false);
+  const issueCalendarRef = React.useRef<HTMLDivElement | null>(null);
+  const dueCalendarRef = React.useRef<HTMLDivElement | null>(null);
 
   const data = projectQuery.data as AdminProjectDetailData | undefined;
+
+  React.useEffect(() => {
+    if (!showIssueCalendar && !showDueCalendar) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+
+      if (showIssueCalendar && issueCalendarRef.current && !issueCalendarRef.current.contains(target)) {
+        setShowIssueCalendar(false);
+      }
+
+      if (showDueCalendar && dueCalendarRef.current && !dueCalendarRef.current.contains(target)) {
+        setShowDueCalendar(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [showIssueCalendar, showDueCalendar]);
 
   if (auth.isLoading || !auth.isAllowed || !auth.user) {
     return <div className="min-h-screen bg-background" />;
@@ -333,7 +381,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
   // Add Invoice
   const handleAddInvoice = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!invNum.trim() || invAmount <= 0 || !invIssueDate || !invDueDate) return;
+    if (!invNum.trim() || invAmount <= 0 || !invIssueDate) return;
 
     createInvoiceMutation.mutate({
       invoiceNumber: invNum,
@@ -350,6 +398,8 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
         setInvIssueDate("");
         setInvDueDate("");
         setInvDoc("");
+        setShowIssueCalendar(false);
+        setShowDueCalendar(false);
         setIsCreateInvoiceOpen(false);
       },
     });
@@ -636,7 +686,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                               {p.notes && <p className="text-xs text-muted-foreground mt-2">{p.notes}</p>}
                               {p.documentUrl && (
                                 <a
-                                  href={p.documentUrl}
+                                  href={resolveAssetUrl(p.documentUrl)}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="inline-block mt-2 text-xs text-primary hover:underline font-bold"
@@ -705,7 +755,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                             </div>
                             <div className="flex items-center gap-2">
                               <a
-                                href={d.documentUrl}
+                                href={resolveAssetUrl(d.documentUrl)}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex min-h-7 items-center justify-center rounded bg-secondary px-2 text-xs font-bold text-foreground hover:bg-border cursor-pointer"
@@ -896,9 +946,11 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                         setInvNum("");
                         setInvAmount(0);
                         setInvStatus("draft");
-                        setInvIssueDate("");
+                        setInvIssueDate(formatDateInput(new Date()));
                         setInvDueDate("");
                         setInvDoc("");
+                        setShowIssueCalendar(false);
+                        setShowDueCalendar(false);
                         setIsCreateInvoiceOpen(true);
                       }}
                       className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
@@ -952,7 +1004,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                                   <div className="flex justify-end gap-2">
                                     {inv.documentUrl && (
                                       <a
-                                        href={inv.documentUrl}
+                                        href={resolveAssetUrl(inv.documentUrl)}
                                         target="_blank"
                                         rel="noreferrer"
                                         className="inline-flex min-h-7 items-center justify-center rounded bg-secondary px-2 text-xs font-bold text-foreground hover:bg-border cursor-pointer"
@@ -1048,6 +1100,11 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   <FileUpload
                     value={milestoneDoc}
                     onChange={setMilestoneDoc}
+                    uploadContext={{
+                      category: "progress",
+                      clientId: data?.project?.clientId,
+                      projectId,
+                    }}
                   />
                 </Field>
               </FieldGroup>
@@ -1123,6 +1180,11 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   <FileUpload
                     value={milestoneDoc}
                     onChange={setMilestoneDoc}
+                    uploadContext={{
+                      category: "progress",
+                      clientId: data?.project?.clientId,
+                      projectId,
+                    }}
                   />
                 </Field>
               </FieldGroup>
@@ -1167,6 +1229,11 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   <FileUpload
                     value={docUrl}
                     onChange={setDocUrl}
+                    uploadContext={{
+                      category: "documents",
+                      clientId: data?.project?.clientId,
+                      projectId,
+                    }}
                   />
                 </Field>
               </FieldGroup>
@@ -1343,12 +1410,13 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                 </Field>
                 <Field className="space-y-1">
                   <FieldLabel htmlFor="inv-amount">Nominal (Rp)</FieldLabel>
-                  <Input
+                  <NumericInput
                     id="inv-amount"
-                    type="number"
                     required
                     value={invAmount}
-                    onChange={(e) => setInvAmount(Number(e.target.value))}
+                    min={0}
+                    onChange={setInvAmount}
+                    placeholder="15000000"
                   />
                 </Field>
                 <Field className="space-y-1">
@@ -1366,30 +1434,86 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   </Select>
                 </Field>
                 <Field className="space-y-1">
+                  <div className="relative" ref={issueCalendarRef}>
                   <FieldLabel htmlFor="inv-issue">Tanggal Terbit</FieldLabel>
-                  <Input
+                  <button
                     id="inv-issue"
-                    type="date"
-                    required
-                    value={invIssueDate}
-                    onChange={(e) => setInvIssueDate(e.target.value)}
-                  />
+                    type="button"
+                    onClick={() => {
+                      setShowIssueCalendar((current) => !current);
+                      setShowDueCalendar(false);
+                    }}
+                    className="flex min-h-11 w-full items-center justify-between rounded-lg border border-input bg-card px-3 py-2 text-left text-sm text-foreground transition-all duration-300 hover:border-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    <span>{formatDateLabel(invIssueDate)}</span>
+                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  {showIssueCalendar && (
+                    <div className="absolute left-0 top-[calc(100%+0.5rem)] z-30 rounded-2xl border border-border bg-card p-2 shadow-2xl">
+                      <Calendar
+                        className="border-0 p-3 shadow-none"
+                        value={parseDateInput(invIssueDate) ?? new Date()}
+                        onChange={(date) => {
+                          setInvIssueDate(formatDateInput(date));
+                          setShowIssueCalendar(false);
+                        }}
+                      />
+                    </div>
+                  )}
+                  </div>
                 </Field>
                 <Field className="space-y-1">
+                  <div className="relative" ref={dueCalendarRef}>
                   <FieldLabel htmlFor="inv-due">Tanggal Jatuh Tempo</FieldLabel>
-                  <Input
+                  <button
                     id="inv-due"
-                    type="date"
-                    required
-                    value={invDueDate}
-                    onChange={(e) => setInvDueDate(e.target.value)}
-                  />
+                    type="button"
+                    onClick={() => {
+                      setShowDueCalendar((current) => !current);
+                      setShowIssueCalendar(false);
+                    }}
+                    className="flex min-h-11 w-full items-center justify-between rounded-lg border border-input bg-card px-3 py-2 text-left text-sm text-foreground transition-all duration-300 hover:border-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    <span>{invDueDate ? formatDateLabel(invDueDate) : "Opsional"}</span>
+                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  {showDueCalendar && (
+                    <div className="absolute left-0 top-[calc(100%+0.5rem)] z-30 w-[21rem] rounded-2xl border border-border bg-card p-2 shadow-2xl">
+                      <div className="space-y-2">
+                        <Calendar
+                          className="border-0 p-3 shadow-none"
+                          value={parseDateInput(invDueDate) ?? parseDateInput(invIssueDate) ?? new Date()}
+                          onChange={(date) => {
+                            setInvDueDate(formatDateInput(date));
+                            setShowDueCalendar(false);
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="w-full"
+                          onClick={() => {
+                            setInvDueDate("");
+                            setShowDueCalendar(false);
+                          }}
+                        >
+                          Kosongkan tanggal jatuh tempo
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  </div>
                 </Field>
                 <Field className="space-y-1">
                   <FieldLabel>Dokumen PDF Invoice</FieldLabel>
                   <FileUpload
                     value={invDoc}
                     onChange={setInvDoc}
+                    uploadContext={{
+                      category: "invoice",
+                      clientId: data?.project?.clientId,
+                      projectId,
+                    }}
                   />
                 </Field>
               </FieldGroup>

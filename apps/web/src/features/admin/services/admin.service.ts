@@ -148,9 +148,24 @@ export async function deleteProjectInvoice(invoiceId: string) {
   return unwrapApiResponse(response.data);
 }
 
-export async function uploadFile(file: File) {
+type UploadFileContext = {
+  category?: string;
+  clientId?: string;
+  projectId?: string;
+};
+
+export async function uploadFile(file: File, context: UploadFileContext = {}) {
   const formData = new FormData();
   formData.append("file", file);
+  if (context.category) {
+    formData.append("category", context.category);
+  }
+  if (context.clientId) {
+    formData.append("clientId", context.clientId);
+  }
+  if (context.projectId) {
+    formData.append("projectId", context.projectId);
+  }
   const response = await apiClient.post<ApiEnvelope<{ url: string }>>("/admin/upload", formData, {
     headers: {
       "Content-Type": "multipart/form-data",

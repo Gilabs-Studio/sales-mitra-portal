@@ -73,11 +73,19 @@ export function DialogContent({
   const context = React.useContext(DialogContext);
 
   return (
-    <div className={cn("relative flex min-h-full items-center justify-center p-4", containerClassName)}>
+    <div
+      className={cn(
+        "pointer-events-none relative flex min-h-full items-center justify-center p-4",
+        containerClassName,
+      )}
+    >
       <div
         role="dialog"
         aria-modal="true"
-        className={cn("relative w-full rounded-lg border border-border bg-card shadow-2xl", className)}
+        className={cn(
+          "pointer-events-auto relative w-full rounded-lg border border-border bg-card shadow-2xl",
+          className,
+        )}
         onClick={(event) => event.stopPropagation()}
       >
         {!hideCloseButton && (

@@ -8,9 +8,20 @@ type FileUploadProps = {
   onChange: (url: string) => void;
   accept?: string;
   disabled?: boolean;
+  uploadContext?: {
+    category?: string;
+    clientId?: string;
+    projectId?: string;
+  };
 };
 
-export function FileUpload({ value, onChange, accept = ".pdf", disabled = false }: FileUploadProps) {
+export function FileUpload({
+  value,
+  onChange,
+  accept = ".pdf",
+  disabled = false,
+  uploadContext,
+}: FileUploadProps) {
   const [isUploading, setIsUploading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -25,10 +36,10 @@ export function FileUpload({ value, onChange, accept = ".pdf", disabled = false 
     setIsUploading(true);
     setError(null);
     try {
-      const result = await uploadFile(file);
+      const result = await uploadFile(file, uploadContext);
       onChange(result.url);
-    } catch (err: any) {
-      setError(err.message ?? "Gagal mengunggah file. Silakan coba kembali.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Gagal mengunggah file. Silakan coba kembali.");
     } finally {
       setIsUploading(false);
     }
