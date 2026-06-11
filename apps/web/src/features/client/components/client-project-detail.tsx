@@ -2,23 +2,11 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import {
-  ArrowLeft,
-  Calendar,
-  Layers,
-  Wrench,
-  FileText,
-  Clock,
-  ExternalLink,
-  Download,
-  Eye,
-  FileSpreadsheet,
-  Info,
-} from "lucide-react";
-import { Link, useRouter } from "@/i18n/routing";
+import { Link } from "@/i18n/routing";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ArrowLeft, Eye, Download } from "lucide-react";
 import {
   useClientProjectDetail,
   useProjectProgress,
@@ -27,6 +15,7 @@ import {
   useProjectMaintenanceLogs,
   useProjectInvoices,
   useProjectReportData,
+  useCreateMaintenanceRequest,
 } from "../hooks/use-client";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -39,6 +28,11 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
   const [previewPdfUrl, setPreviewPdfUrl] = React.useState<string | null>(null);
   const [previewPdfTitle, setPreviewPdfTitle] = React.useState<string>("");
 
+  // Request Maintenance form state
+  const [isRequestMaintenanceOpen, setIsRequestMaintenanceOpen] = React.useState(false);
+  const [reqDescription, setReqDescription] = React.useState("");
+  const [selectedMaintId, setSelectedMaintId] = React.useState("");
+
   const projectQuery = useClientProjectDetail(projectId);
   const progressQuery = useProjectProgress(projectId);
   const docsQuery = useProjectDocuments(projectId);
@@ -46,6 +40,8 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
   const maintLogsQuery = useProjectMaintenanceLogs(projectId);
   const invoicesQuery = useProjectInvoices(projectId);
   const reportQuery = useProjectReportData(projectId);
+
+  const requestMaintenanceMutation = useCreateMaintenanceRequest(projectId);
 
   if (auth.isLoading || !auth.isAllowed || !auth.user) {
     return <div className="min-h-screen bg-background" />;
@@ -60,8 +56,24 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
   };
 
   const handleDownloadReport = () => {
-    // Generate simple printable view or print window
     window.print();
+  };
+
+  const handleRequestMaintenanceSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reqDescription.trim() || !selectedMaintId) return;
+
+    requestMaintenanceMutation.mutate(
+      { description: reqDescription, maintenanceId: selectedMaintId },
+      {
+        onSuccess: () => {
+          setReqDescription("");
+          setSelectedMaintId("");
+          setIsRequestMaintenanceOpen(false);
+          alert("Request maintenance berhasil dikirim.");
+        },
+      }
+    );
   };
 
   return (
@@ -73,6 +85,7 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
             <Link
               href="/client/projects"
               className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer transition-colors"
+              title="Kembali"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -100,25 +113,23 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
               {/* Tabs Buttons */}
               <div className="flex border-b border-border overflow-x-auto gap-2">
                 {[
-                  { id: "progress", label: t("projectProgress"), icon: Clock },
-                  { id: "deliverables", label: t("projectDeliverables"), icon: Layers },
-                  { id: "maintenance", label: t("projectMaintenance"), icon: Wrench },
-                  { id: "invoice", label: t("projectInvoices"), icon: FileText },
-                  { id: "reports", label: t("projectReports"), icon: FileSpreadsheet },
+                  { id: "progress", label: t("projectProgress") },
+                  { id: "deliverables", label: t("projectDeliverables") },
+                  { id: "maintenance", label: t("projectMaintenance") },
+                  { id: "invoice", label: t("projectInvoices") },
+                  { id: "reports", label: t("projectReports") },
                 ].map((tab) => {
-                  const Icon = tab.icon;
                   const active = activeTab === tab.id;
                   return (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id as TabType)}
-                      className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition-all whitespace-nowrap cursor-pointer hover:text-primary ${
+                      className={`border-b-2 px-4 py-3 text-sm font-bold transition-all whitespace-nowrap cursor-pointer hover:text-primary ${
                         active
-                          ? "border-primary text-primary"
+                          ? "border-primary text-primary font-extrabold"
                           : "border-transparent text-muted-foreground"
                       }`}
                     >
-                      <Icon className="h-4 w-4" />
                       {tab.label}
                     </button>
                   );
@@ -128,8 +139,7 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
               {/* Progress Tab */}
               {activeTab === "progress" && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-extrabold text-foreground flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-primary" />
+                  <h3 className="text-lg font-extrabold text-foreground">
                     Timeline Milestone Progres
                   </h3>
                   <div className="relative border-l border-border pl-6 ml-4 space-y-6">
@@ -183,18 +193,18 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
                               <div className="mt-3 flex gap-2">
                                 <button
                                   onClick={() => handlePreviewPdf(prog.documentUrl!, prog.title)}
-                                  className="inline-flex items-center gap-1.5 rounded bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary transition-all hover:bg-primary/20 cursor-pointer"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer transition-colors"
+                                  title="Lihat PDF"
                                 >
-                                  <Eye className="h-3 w-3" />
-                                  {t("preview")}
+                                  <Eye className="h-4 w-4" />
                                 </button>
                                 <a
                                   href={prog.documentUrl}
                                   download
-                                  className="inline-flex items-center gap-1.5 rounded bg-secondary px-2.5 py-1 text-[10px] font-bold text-foreground transition-all hover:bg-border cursor-pointer"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer transition-colors"
+                                  title="Unduh PDF"
                                 >
-                                  <Download className="h-3 w-3" />
-                                  {t("download")}
+                                  <Download className="h-4 w-4" />
                                 </a>
                               </div>
                             )}
@@ -231,9 +241,9 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
                             href={project.websiteUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-primary hover:opacity-80 cursor-pointer"
+                            className="text-xs font-bold text-primary hover:underline cursor-pointer"
                           >
-                            <ExternalLink className="h-4 w-4" />
+                            Buka Situs
                           </a>
                         </div>
                       )}
@@ -249,9 +259,9 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
                             href={project.stagingUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-primary hover:opacity-80 cursor-pointer"
+                            className="text-xs font-bold text-primary hover:underline cursor-pointer"
                           >
-                            <ExternalLink className="h-4 w-4" />
+                            Buka Situs
                           </a>
                         </div>
                       )}
@@ -300,7 +310,7 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
                               <button
                                 onClick={() => handlePreviewPdf(doc.documentUrl, doc.title)}
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer transition-colors"
-                                title={t("preview")}
+                                title="Lihat"
                               >
                                 <Eye className="h-4 w-4" />
                               </button>
@@ -308,7 +318,7 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
                                 href={doc.documentUrl}
                                 download
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer transition-colors"
-                                title={t("download")}
+                                title="Unduh"
                               >
                                 <Download className="h-4 w-4" />
                               </a>
@@ -328,49 +338,72 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
               {/* Maintenance Tab */}
               {activeTab === "maintenance" && (
                 <div className="space-y-6">
-                  {/* Quota details */}
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-extrabold text-foreground">
+                      Paket Maintenance
+                    </h3>
+                    {maintenanceQuery.data && maintenanceQuery.data.length > 0 && (
+                      <button
+                        onClick={() => {
+                          const firstAvail = maintenanceQuery.data.find(m => m.quotaLimit - m.quotaUsed > 0);
+                          setSelectedMaintId(firstAvail?.id ?? "");
+                          setIsRequestMaintenanceOpen(true);
+                        }}
+                        className="inline-flex min-h-9 items-center justify-center rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                      >
+                        Ajukan Maintenance
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Quota details list */}
                   {maintenanceQuery.isLoading ? (
                     <div className="h-32 animate-pulse bg-muted rounded-md" />
-                  ) : maintenanceQuery.data && maintenanceQuery.data.id ? (
-                    <div className="rounded-lg border border-border bg-card p-5">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600">
-                            Paket Terdaftar
-                          </span>
-                          <h3 className="text-lg font-extrabold text-foreground mt-1">
-                            {maintenanceQuery.data.packageName}
-                          </h3>
-                        </div>
-                        <span className="rounded-full bg-teal-500/15 px-3 py-0.5 text-xs font-bold text-teal-600">
-                          Aktif
-                        </span>
-                      </div>
+                  ) : maintenanceQuery.data && maintenanceQuery.data.length > 0 ? (
+                    <div className="space-y-4">
+                      {maintenanceQuery.data.map((maint) => (
+                        <div key={maint.id} className="rounded-lg border border-border bg-card p-5">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600">
+                                Paket Terdaftar
+                              </span>
+                              <h3 className="text-lg font-extrabold text-foreground mt-1">
+                                {maint.packageName}
+                              </h3>
+                            </div>
+                            <span className="rounded-full bg-teal-500/15 px-3 py-0.5 text-xs font-bold text-teal-600">
+                              Aktif
+                            </span>
+                          </div>
 
-                      <div className="mt-5">
-                        <div className="flex justify-between text-sm text-muted-foreground mb-1.5">
-                          <span>Pemakaian kuota maintenance tahunan</span>
-                          <span className="font-extrabold text-foreground">
-                            {maintenanceQuery.data.quotaUsed} / {maintenanceQuery.data.quotaLimit} Request
-                          </span>
-                        </div>
-                        <div className="h-3 w-full rounded-full bg-border overflow-hidden">
-                          <div
-                            className="h-full bg-teal-500 rounded-full transition-all duration-500"
-                            style={{
-                              width: `${Math.min(
-                                (maintenanceQuery.data.quotaUsed / maintenanceQuery.data.quotaLimit) * 100,
-                                100
-                              )}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
+                          <div className="mt-5">
+                            <div className="flex justify-between text-sm text-muted-foreground mb-1.5">
+                              <span>Pemakaian kuota maintenance tahunan</span>
+                              <span className="font-extrabold text-foreground">
+                                {maint.quotaUsed} / {maint.quotaLimit} Request
+                              </span>
+                            </div>
+                            <div className="h-3 w-full rounded-full bg-border overflow-hidden">
+                              <div
+                                className="h-full bg-teal-500 rounded-full transition-all duration-500"
+                                style={{
+                                  width: `${Math.min(
+                                    (maint.quotaUsed / maint.quotaLimit) * 100,
+                                    100
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
 
-                      <div className="mt-4 flex flex-col sm:flex-row justify-between gap-2 text-xs text-muted-foreground border-t border-border/60 pt-4">
-                        <span>Sisa Kuota: <strong>{maintenanceQuery.data.quotaLimit - maintenanceQuery.data.quotaUsed} request</strong></span>
-                        <span>Periode Aktif: {maintenanceQuery.data.startDate} s/d {maintenanceQuery.data.endDate}</span>
-                      </div>
+                          <div className="mt-4 flex flex-col sm:flex-row justify-between gap-2 text-xs text-muted-foreground border-t border-border/60 pt-4">
+                            <span>Sisa Kuota: <strong>{maint.quotaLimit - maint.quotaUsed} request</strong></span>
+                            <span>Periode Aktif: {maint.startDate} s/d {maint.endDate}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="rounded-lg border border-border bg-card p-5 text-center text-muted-foreground">
@@ -427,8 +460,7 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
               {/* Invoice Tab */}
               {activeTab === "invoice" && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-extrabold text-foreground flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" />
+                  <h3 className="text-lg font-extrabold text-foreground">
                     Daftar Invoice & Pembayaran
                   </h3>
                   {invoicesQuery.isLoading ? (
@@ -486,7 +518,7 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
                                       <button
                                         onClick={() => handlePreviewPdf(inv.documentUrl, `Invoice ${inv.invoiceNumber}`)}
                                         className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer transition-colors"
-                                        title={t("viewPdf")}
+                                        title="Lihat"
                                       >
                                         <Eye className="h-4 w-4" />
                                       </button>
@@ -494,7 +526,7 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
                                         href={inv.documentUrl}
                                         download
                                         className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer transition-colors"
-                                        title={t("downloadPdf")}
+                                        title="Unduh"
                                       >
                                         <Download className="h-4 w-4" />
                                       </a>
@@ -529,9 +561,8 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
                     </p>
                     <button
                       onClick={handleDownloadReport}
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
                     >
-                      <Download className="h-4 w-4" />
                       Cetak / Unduh Laporan Project
                     </button>
                   </div>
@@ -575,19 +606,13 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
                   Metadata Project
                 </h3>
                 <div className="space-y-4">
-                  <div className="flex gap-3">
-                    <Calendar className="h-4 w-4 mt-0.5 text-primary shrink-0" />
-                    <div>
-                      <h4 className="text-xs font-bold text-foreground">{t("startDate")}</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">{project?.startDate}</p>
-                    </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-foreground">{t("startDate")}</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">{project?.startDate}</p>
                   </div>
-                  <div className="flex gap-3">
-                    <Calendar className="h-4 w-4 mt-0.5 text-primary shrink-0" />
-                    <div>
-                      <h4 className="text-xs font-bold text-foreground">{t("targetEndDate")}</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">{project?.targetEndDate}</p>
-                    </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-foreground">{t("targetEndDate")}</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">{project?.targetEndDate}</p>
                   </div>
                   <div className="border-t border-border/60 my-2" />
                   <div>
@@ -603,8 +628,7 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
 
               {/* Description Panel */}
               <div className="rounded-lg border border-border bg-card p-5">
-                <h3 className="text-sm font-extrabold text-foreground flex items-center gap-1.5 mb-2">
-                  <Info className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-extrabold text-foreground mb-2">
                   Deskripsi Proyek
                 </h3>
                 <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
@@ -616,6 +640,73 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
         )}
       </div>
 
+      {/* Request Maintenance Dialog Overlay */}
+      {isRequestMaintenanceOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
+          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+            <h2 className="text-xl font-extrabold text-foreground">Ajukan Request Maintenance</h2>
+            <form onSubmit={handleRequestMaintenanceSubmit} className="mt-4 space-y-4">
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label htmlFor="maint-select" className="text-xs font-bold text-muted-foreground uppercase">
+                    Pilih Paket / Layanan
+                  </label>
+                  <select
+                    id="maint-select"
+                    required
+                    value={selectedMaintId}
+                    onChange={(e) => setSelectedMaintId(e.target.value)}
+                    className="flex h-10 w-full rounded-lg border border-input bg-muted px-3 py-1.5 text-sm focus-visible:outline-none cursor-pointer"
+                  >
+                    <option value="">-- Pilih Paket Maintenance --</option>
+                    {maintenanceQuery.data?.map((m) => (
+                      <option key={m.id} value={m.id} disabled={m.quotaUsed >= m.quotaLimit}>
+                        {m.packageName} (Sisa: {m.quotaLimit - m.quotaUsed} request)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="req-desc" className="text-xs font-bold text-muted-foreground uppercase">
+                    Deskripsi Masalah / Pekerjaan
+                  </label>
+                  <textarea
+                    id="req-desc"
+                    required
+                    value={reqDescription}
+                    onChange={(e) => setReqDescription(e.target.value)}
+                    placeholder="Contoh: Perbaikan halaman checkout yang crash saat diklik..."
+                    className="flex min-h-[100px] w-full rounded-lg border border-input bg-muted p-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+              </div>
+              {requestMaintenanceMutation.isError && (
+                <p className="text-xs font-bold text-destructive">
+                  {(requestMaintenanceMutation.error as any)?.response?.data?.message || (requestMaintenanceMutation.error as any)?.message || "Gagal mengirim request."}
+                </p>
+              )}
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsRequestMaintenanceOpen(false)}
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-secondary px-4 py-2 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={requestMaintenanceMutation.isPending || !selectedMaintId}
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 cursor-pointer"
+                >
+                  {requestMaintenanceMutation.isPending ? "Mengirim..." : "Kirim"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* PDF Preview Modal overlay */}
       {previewPdfUrl && (
         <div className="fixed inset-0 z-[100] flex flex-col justify-between bg-black/60 p-4">
@@ -625,9 +716,8 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
               <a
                 href={previewPdfUrl}
                 download
-                className="inline-flex min-h-8 items-center justify-center gap-1 rounded bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition-all hover:-translate-y-0.5 cursor-pointer"
+                className="inline-flex min-h-8 items-center justify-center rounded bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition-all hover:-translate-y-0.5 cursor-pointer"
               >
-                <Download className="h-3 w-3" />
                 Unduh
               </a>
               <button

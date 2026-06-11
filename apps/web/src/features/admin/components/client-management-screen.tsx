@@ -5,8 +5,7 @@ import { Plus, Trash2, Key, ArrowRight, ShieldAlert } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
-import { useAdminClients, useCreateClient, useDeleteClient, useResetClientPassword } from "../hooks/use-admin-projects";
-import { DeleteDialog } from "@/components/ui/delete-dialog";
+import { useAdminClients, useCreateClient, useResetClientPassword, useUpdateUserSuspension } from "../hooks/use-admin-projects";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,12 +17,12 @@ export function ClientManagementScreen() {
   const [page, setPage] = React.useState(1);
   const clientsQuery = useAdminClients({ page, pageSize: 15 });
   const createClientMutation = useCreateClient();
-  const deleteClientMutation = useDeleteClient();
+  const updateSuspensionMutation = useUpdateUserSuspension();
   const resetPasswordMutation = useResetClientPassword();
 
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [deleteOpen, setDeleteOpen] = React.useState(false);
-  const [selectedClient, setSelectedClient] = React.useState<{ id: string; name: string } | null>(null);
+  const [toggleOpen, setToggleOpen] = React.useState(false);
+  const [selectedClient, setSelectedClient] = React.useState<{ id: string; name: string; isSuspended: boolean } | null>(null);
 
   // Form states
   const [newName, setNewName] = React.useState("");
@@ -86,19 +85,26 @@ export function ClientManagementScreen() {
     );
   };
 
-  const handleDeleteTrigger = (id: string, name: string) => {
-    setSelectedClient({ id, name });
-    setDeleteOpen(true);
+  const handleToggleStatusTrigger = (id: string, name: string, isSuspended: boolean) => {
+    setSelectedClient({ id, name, isSuspended });
+    setToggleOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmToggleStatus = () => {
     if (!selectedClient) return;
-    deleteClientMutation.mutate(selectedClient.id, {
-      onSuccess: () => {
-        setDeleteOpen(false);
-        setSelectedClient(null);
+    updateSuspensionMutation.mutate(
+      {
+        userId: selectedClient.id,
+        isSuspended: !selectedClient.isSuspended,
+        reason: "Administrative Action",
       },
-    });
+      {
+        onSuccess: () => {
+          setToggleOpen(false);
+          setSelectedClient(null);
+        },
+      }
+    );
   };
 
   const handleTriggerReset = (id: string) => {
@@ -196,17 +202,15 @@ export function ClientManagementScreen() {
                             </Link>
                             <button
                               onClick={() => handleTriggerReset(c.id)}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer transition-colors"
-                              title="Reset Password Klien"
+                              className="inline-flex min-h-8 items-center justify-center rounded bg-secondary px-3 py-1.5 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
                             >
-                              <Key className="h-4 w-4" />
+                              Reset Sandi
                             </button>
                             <button
-                              onClick={() => handleDeleteTrigger(c.id, c.name)}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive hover:bg-destructive/5 cursor-pointer transition-colors"
-                              title="Hapus Klien"
+                              onClick={() => handleToggleStatusTrigger(c.id, c.name, c.isSuspended)}
+                              className="inline-flex min-h-8 items-center justify-center rounded bg-secondary px-3 py-1.5 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              {c.isSuspended ? "Aktifkan" : "Tangguhkan"}
                             </button>
                           </div>
                         </td>
@@ -336,13 +340,31 @@ export function ClientManagementScreen() {
         </div>
       )}
 
-      {/* Delete Client Dialog Confirmation */}
-      <DeleteDialog
-        open={deleteOpen}
-        itemName={selectedClient?.name ?? ""}
-        onOpenChange={setDeleteOpen}
-        onConfirm={handleConfirmDelete}
-      />
+      {/* Toggle Client Status Dialog Confirmation */}
+      {toggleOpen && selectedClient && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
+          <div className="w-full max-w-sm rounded-lg border border-border bg-card p-5 shadow-xl">
+            <h2 className="text-lg font-extrabold text-foreground">
+              {selectedClient.isSuspended ? "Aktifkan Akun?" : "Tangguhkan Akun?"}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Apakah Anda yakin ingin {selectedClient.isSuspended ? "mengaktifkan kembali" : "menangguhkan"} akun klien <strong>{selectedClient.name}</strong>?
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setToggleOpen(false)}>
+                Batal
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmToggleStatus}
+                isLoading={updateSuspensionMutation.isPending}
+              >
+                Konfirmasi
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

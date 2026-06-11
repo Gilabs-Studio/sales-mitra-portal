@@ -3,7 +3,6 @@
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { useTranslations } from "next-intl";
-import { KeyRound, ShieldAlert } from "lucide-react";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
 import { useUpdateClientProfile } from "../hooks/use-client";
@@ -99,8 +98,7 @@ export function ClientProfileSettings() {
               </div>
             )}
             {errorMsg && (
-              <div className="rounded-md bg-destructive/10 p-3 text-xs font-semibold text-destructive border border-destructive/20 flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4 shrink-0" />
+              <div className="rounded-md bg-destructive/10 p-3 text-xs font-semibold text-destructive border border-destructive/20">
                 {errorMsg}
               </div>
             )}
@@ -128,8 +126,7 @@ export function ClientProfileSettings() {
 
               <div className="border-t border-border/60 my-4 pt-4" />
 
-              <h3 className="text-sm font-extrabold text-foreground flex items-center gap-2 mb-2">
-                <KeyRound className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-extrabold text-foreground mb-2">
                 Ganti Password Baru
               </h3>
 

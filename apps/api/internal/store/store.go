@@ -85,6 +85,25 @@ func New(db *sql.DB) *Store {
 }
 
 func (s *Store) Migrate() error {
+	var oldExists int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='client_projects'`).Scan(&oldExists)
+	if err == nil && oldExists > 0 {
+		oldTables := []string{
+			"DROP TABLE IF EXISTS project_progress",
+			"DROP TABLE IF EXISTS project_documents",
+			"DROP TABLE IF EXISTS project_invoices",
+			"DROP TABLE IF EXISTS client_projects",
+			"DROP TABLE IF EXISTS maintenance_plans",
+			"DROP TABLE IF EXISTS maintenance_logs",
+			"DROP TABLE IF EXISTS project_activities",
+		}
+		for _, stmt := range oldTables {
+			if _, err := s.db.Exec(stmt); err != nil {
+				return err
+			}
+		}
+	}
+
 	tables := []string{
 		`CREATE TABLE IF NOT EXISTS users (
 			id TEXT PRIMARY KEY,
@@ -2170,6 +2189,23 @@ func (s *Store) DeleteProjectProgress(ctx context.Context, id string) error {
 	return nil
 }
 
+func (s *Store) UpdateProjectProgress(ctx context.Context, p domain.ProjectProgress) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`UPDATE project_progress SET
+			title = ?, status = ?, percentage = ?, update_date = ?, notes = ?, document_url = ?
+		WHERE id = ?`,
+		p.Title,
+		p.Status,
+		p.Percentage,
+		p.UpdateDate,
+		p.Notes,
+		p.DocumentURL,
+		p.ID,
+	)
+	return err
+}
+
 func (s *Store) CreateProjectDocument(ctx context.Context, d domain.ProjectDocument) error {
 	_, err := s.db.ExecContext(
 		ctx,
@@ -2226,18 +2262,11 @@ func (s *Store) DeleteProjectDocument(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *Store) CreateOrUpdateProjectMaintenance(ctx context.Context, pm domain.ProjectMaintenance) error {
+func (s *Store) CreateProjectMaintenance(ctx context.Context, pm domain.ProjectMaintenance) error {
 	_, err := s.db.ExecContext(
 		ctx,
 		`INSERT INTO project_maintenance (id, project_id, package_name, start_date, end_date, quota_limit, quota_used, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(project_id) DO UPDATE SET
-			package_name = excluded.package_name,
-			start_date = excluded.start_date,
-			end_date = excluded.end_date,
-			quota_limit = excluded.quota_limit,
-			quota_used = excluded.quota_used,
-			updated_at = excluded.updated_at`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		pm.ID,
 		pm.ProjectID,
 		pm.PackageName,
@@ -2251,13 +2280,45 @@ func (s *Store) CreateOrUpdateProjectMaintenance(ctx context.Context, pm domain.
 	return err
 }
 
-func (s *Store) GetProjectMaintenance(ctx context.Context, projectID string) (domain.ProjectMaintenance, error) {
+func (s *Store) UpdateProjectMaintenance(ctx context.Context, pm domain.ProjectMaintenance) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`UPDATE project_maintenance SET
+			package_name = ?, start_date = ?, end_date = ?, quota_limit = ?, quota_used = ?, updated_at = ?
+		 WHERE id = ?`,
+		pm.PackageName,
+		pm.StartDate,
+		pm.EndDate,
+		pm.QuotaLimit,
+		pm.QuotaUsed,
+		formatTime(time.Now().UTC()),
+		pm.ID,
+	)
+	return err
+}
+
+func (s *Store) DeleteProjectMaintenance(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, "DELETE FROM project_maintenance WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) GetProjectMaintenanceByID(ctx context.Context, id string) (domain.ProjectMaintenance, error) {
 	row := s.db.QueryRowContext(
 		ctx,
 		`SELECT id, project_id, package_name, start_date, end_date, quota_limit, quota_used, created_at, updated_at
 		 FROM project_maintenance
-		 WHERE project_id = ?`,
-		projectID,
+		 WHERE id = ?`,
+		id,
 	)
 
 	var pm domain.ProjectMaintenance
@@ -2273,15 +2334,54 @@ func (s *Store) GetProjectMaintenance(ctx context.Context, projectID string) (do
 	return pm, nil
 }
 
-func (s *Store) IncrementMaintenanceQuotaUsed(ctx context.Context, projectID string, delta int) error {
+func (s *Store) ListProjectMaintenance(ctx context.Context, projectID string) ([]domain.ProjectMaintenance, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT id, project_id, package_name, start_date, end_date, quota_limit, quota_used, created_at, updated_at
+		 FROM project_maintenance
+		 WHERE project_id = ?
+		 ORDER BY created_at DESC`,
+		projectID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := []domain.ProjectMaintenance{}
+	for rows.Next() {
+		var pm domain.ProjectMaintenance
+		var createdAt, updatedAt string
+		if err := rows.Scan(&pm.ID, &pm.ProjectID, &pm.PackageName, &pm.StartDate, &pm.EndDate, &pm.QuotaLimit, &pm.QuotaUsed, &createdAt, &updatedAt); err != nil {
+			return nil, err
+		}
+		pm.CreatedAt = parseTime(createdAt)
+		pm.UpdatedAt = parseTime(updatedAt)
+		list = append(list, pm)
+	}
+	return list, rows.Err()
+}
+
+func (s *Store) GetProjectMaintenance(ctx context.Context, projectID string) (domain.ProjectMaintenance, error) {
+	list, err := s.ListProjectMaintenance(ctx, projectID)
+	if err != nil {
+		return domain.ProjectMaintenance{}, err
+	}
+	if len(list) == 0 {
+		return domain.ProjectMaintenance{}, ErrNotFound
+	}
+	return list[0], nil
+}
+
+func (s *Store) IncrementMaintenanceQuotaUsed(ctx context.Context, id string, delta int) error {
 	result, err := s.db.ExecContext(
 		ctx,
 		`UPDATE project_maintenance
 		 SET quota_used = quota_used + ?, updated_at = ?
-		 WHERE project_id = ?`,
+		 WHERE id = ?`,
 		delta,
 		formatTime(time.Now().UTC()),
-		projectID,
+		id,
 	)
 	if err != nil {
 		return err

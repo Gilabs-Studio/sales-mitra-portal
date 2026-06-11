@@ -2,7 +2,6 @@
 
 import { useTranslations } from "next-intl";
 import Image from "next/image";
-import { LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -73,7 +72,6 @@ export function ClientLoginScreen() {
             isLoading={isLoading}
             className="w-full justify-center min-h-11 font-bold cursor-pointer transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 hover:shadow-lg hover:shadow-primary/30"
           >
-            <LogIn className="h-4 w-4" aria-hidden="true" />
             Masuk Portal
           </Button>
         </form>

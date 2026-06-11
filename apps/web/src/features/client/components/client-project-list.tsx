@@ -1,7 +1,6 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { FolderKanban, ArrowRight } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
@@ -39,7 +38,6 @@ export function ClientProjectList() {
           </div>
         ) : projects.length === 0 ? (
           <div className="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground">
-            <FolderKanban className="mx-auto h-12 w-12 text-muted-foreground/50 mb-3" />
             <h3 className="text-md font-bold text-foreground">Belum ada project terdaftar</h3>
             <p className="mt-1 text-sm text-muted-foreground">Hubungi tim GiLabs untuk mendaftarkan project baru Anda.</p>
           </div>
@@ -90,10 +88,9 @@ export function ClientProjectList() {
                       <td className="border-b border-border px-4 py-3">
                         <Link
                           href={`/client/projects/${p.id}`}
-                          className="inline-flex items-center gap-1 text-xs font-extrabold text-primary hover:underline cursor-pointer"
+                          className="inline-flex items-center text-xs font-extrabold text-primary hover:underline cursor-pointer"
                         >
                           Buka
-                          <ArrowRight className="h-3.5 w-3.5" />
                         </Link>
                       </td>
                     </tr>

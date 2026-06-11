@@ -15,11 +15,16 @@ import {
   createProjectDocument,
   deleteProjectDocument,
   createOrUpdateProjectMaintenance,
+  createProjectMaintenance,
+  updateProjectMaintenance,
+  deleteProjectMaintenance,
   createMaintenanceLog,
   deleteMaintenanceLog,
   createProjectInvoice,
   updateProjectInvoice,
   deleteProjectInvoice,
+  updateProjectProgress,
+  updateUserSuspension,
 } from "../services/admin.service";
 
 export function useAdminClients(params: { page?: number; pageSize?: number } = {}) {
@@ -137,6 +142,17 @@ export function useDeleteProjectProgress(projectId: string) {
   });
 }
 
+export function useUpdateProjectProgress(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ progressId, payload }: { progressId: string; payload: any }) =>
+      updateProjectProgress(projectId, progressId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+    },
+  });
+}
+
 // Project Documents
 export function useCreateProjectDocument(projectId: string) {
   const queryClient = useQueryClient();
@@ -214,6 +230,47 @@ export function useDeleteProjectInvoice(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (invoiceId: string) => deleteProjectInvoice(invoiceId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+    },
+  });
+}
+
+export function useUpdateUserSuspension() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, isSuspended, reason }: { userId: string; isSuspended: boolean; reason: string }) =>
+      updateUserSuspension(userId, { isSuspended, reason }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "clients"] });
+    },
+  });
+}
+
+export function useCreateProjectMaintenance(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: any) => createProjectMaintenance(projectId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+    },
+  });
+}
+
+export function useUpdateProjectMaintenance(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ maintId, payload }: { maintId: string; payload: any }) => updateProjectMaintenance(projectId, maintId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+    },
+  });
+}
+
+export function useDeleteProjectMaintenance(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (maintId: string) => deleteProjectMaintenance(projectId, maintId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
     },

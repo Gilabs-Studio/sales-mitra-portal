@@ -10,6 +10,7 @@ import {
   getProjectReportData,
   listClientProjects,
   updateClientProfile,
+  createMaintenanceRequest,
 } from "../services/client.service";
 
 export function useClientDashboard() {
@@ -90,6 +91,30 @@ export function useUpdateClientProfile() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
       void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
+    },
+  });
+}
+
+export function useCreateMaintenanceRequest(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { description: string; maintenanceId: string }) => createMaintenanceRequest(projectId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "maintenance"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "maintenance-logs"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "reports"] });
+    },
+  });
+}
+
+export function useCreateMaintenanceRequestGeneric() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, payload }: { projectId: string; payload: { description: string; maintenanceId: string } }) =>
+      createMaintenanceRequest(projectId, payload),
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", variables.projectId] });
     },
   });
 }

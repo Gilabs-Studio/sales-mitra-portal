@@ -25,12 +25,15 @@ import {
   useDeleteProjectProgress,
   useCreateProjectDocument,
   useDeleteProjectDocument,
-  useCreateOrUpdateMaintenance,
+  useCreateProjectMaintenance,
+  useUpdateProjectMaintenance,
+  useDeleteProjectMaintenance,
   useCreateMaintenanceLog,
   useDeleteMaintenanceLog,
   useCreateProjectInvoice,
   useUpdateProjectInvoice,
   useDeleteProjectInvoice,
+  useUpdateProjectProgress,
 } from "../hooks/use-admin-projects";
 import { DeleteDialog } from "@/components/ui/delete-dialog";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
@@ -39,6 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { FileUpload } from "@/components/ui/file-upload";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 type TabType = "info" | "progress" | "docs" | "maintenance" | "invoice";
@@ -54,16 +58,29 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
   const deleteProgressMutation = useDeleteProjectProgress(projectId);
   const createDocMutation = useCreateProjectDocument(projectId);
   const deleteDocMutation = useDeleteProjectDocument(projectId);
-  const saveMaintMutation = useCreateOrUpdateMaintenance(projectId);
+  const createMaintMutation = useCreateProjectMaintenance(projectId);
+  const updateMaintMutation = useUpdateProjectMaintenance(projectId);
+  const deleteMaintMutation = useDeleteProjectMaintenance(projectId);
   const createMaintLogMutation = useCreateMaintenanceLog(projectId);
   const deleteMaintLogMutation = useDeleteMaintenanceLog(projectId);
   const createInvoiceMutation = useCreateProjectInvoice(projectId);
   const updateInvoiceMutation = useUpdateProjectInvoice(projectId);
   const deleteInvoiceMutation = useDeleteProjectInvoice(projectId);
+  const updateProgressMutation = useUpdateProjectProgress(projectId);
 
   // Modal / Delete dialog states
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleteContext, setDeleteContext] = React.useState<{ type: string; id: string; name: string } | null>(null);
+
+  // Modal dialog open/close states
+  const [isCreateProgressOpen, setIsCreateProgressOpen] = React.useState(false);
+  const [isEditProgressOpen, setIsEditProgressOpen] = React.useState(false);
+  const [editingProgressItem, setEditingProgressItem] = React.useState<any | null>(null);
+  const [isCreateDocOpen, setIsCreateDocOpen] = React.useState(false);
+  const [isCreateMaintLogOpen, setIsCreateMaintLogOpen] = React.useState(false);
+  const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = React.useState(false);
+  const [isMaintSetupOpen, setIsMaintSetupOpen] = React.useState(false);
+  const [editingMaintItem, setEditingMaintItem] = React.useState<any | null>(null);
 
   // Edit Project Info form states
   const [name, setName] = React.useState("");
@@ -99,6 +116,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
   const [logDesc, setLogDesc] = React.useState("");
   const [logStatus, setLogStatus] = React.useState("pending");
   const [logPic, setLogPic] = React.useState("");
+  const [selectedMaintLogId, setSelectedMaintLogId] = React.useState("");
 
   // Invoice Form
   const [invNum, setInvNum] = React.useState("");
@@ -126,13 +144,6 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
       setCredentials(p.credentials ?? "");
       setDocumentation(p.documentation ?? "");
     }
-    if (data?.maintenance) {
-      const m = data.maintenance;
-      setMaintPackage(m.packageName);
-      setMaintStart(m.startDate);
-      setMaintEnd(m.endDate);
-      setMaintLimit(m.quotaLimit);
-    }
   }, [data]);
 
   if (auth.isLoading || !auth.isAllowed || !auth.user) {
@@ -159,6 +170,16 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
     });
   };
 
+  const handleEditProgressTrigger = (item: any) => {
+    setEditingProgressItem(item);
+    setMilestoneTitle(item.title);
+    setMilestoneStatus(item.status);
+    setMilestonePercent(item.percentage);
+    setMilestoneNotes(item.notes ?? "");
+    setMilestoneDoc(item.documentUrl ?? "");
+    setIsEditProgressOpen(true);
+  };
+
   // Submit new milestone
   const handleAddMilestone = (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,6 +198,34 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
         setMilestoneDoc("");
         setMilestonePercent(0);
         setMilestoneStatus("pending");
+        setIsCreateProgressOpen(false);
+      },
+    });
+  };
+
+  // Update milestone
+  const handleUpdateMilestone = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProgressItem || !milestoneTitle.trim()) return;
+
+    updateProgressMutation.mutate({
+      progressId: editingProgressItem.id,
+      payload: {
+        title: milestoneTitle,
+        status: milestoneStatus,
+        percentage: Number(milestonePercent),
+        notes: milestoneNotes,
+        documentUrl: milestoneDoc,
+      },
+    }, {
+      onSuccess: () => {
+        setMilestoneTitle("");
+        setMilestoneNotes("");
+        setMilestoneDoc("");
+        setMilestonePercent(0);
+        setMilestoneStatus("pending");
+        setEditingProgressItem(null);
+        setIsEditProgressOpen(false);
       },
     });
   };
@@ -193,6 +242,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
       onSuccess: () => {
         setDocTitle("");
         setDocUrl("");
+        setIsCreateDocOpen(false);
       },
     });
   };
@@ -202,32 +252,59 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
     e.preventDefault();
     if (!maintPackage.trim() || !maintStart || !maintEnd) return;
 
-    saveMaintMutation.mutate({
+    const payload = {
       packageName: maintPackage,
       startDate: maintStart,
       endDate: maintEnd,
       quotaLimit: Number(maintLimit),
-      quotaUsed: data?.maintenance?.quotaUsed ?? 0,
-    }, {
-      onSuccess: () => alert("Paket maintenance berhasil dikonfigurasi."),
-    });
+      quotaUsed: editingMaintItem ? Number(editingMaintItem.quotaUsed) : 0,
+    };
+
+    if (editingMaintItem) {
+      updateMaintMutation.mutate({
+        maintId: editingMaintItem.id,
+        payload,
+      }, {
+        onSuccess: () => {
+          setIsMaintSetupOpen(false);
+          setEditingMaintItem(null);
+          setMaintPackage("");
+          setMaintStart("");
+          setMaintEnd("");
+          setMaintLimit(12);
+        },
+      });
+    } else {
+      createMaintMutation.mutate(payload, {
+        onSuccess: () => {
+          setIsMaintSetupOpen(false);
+          setMaintPackage("");
+          setMaintStart("");
+          setMaintEnd("");
+          setMaintLimit(12);
+        },
+      });
+    }
   };
 
   // Add maintenance request usage log
   const handleAddMaintLog = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!logDesc.trim() || !logPic.trim()) return;
+    if (!logDesc.trim() || !logPic.trim() || !selectedMaintLogId) return;
 
     createMaintLogMutation.mutate({
       description: logDesc,
       status: logStatus,
       picName: logPic,
+      maintenanceId: selectedMaintLogId,
       requestDate: new Date().toISOString().split("T")[0],
     }, {
       onSuccess: () => {
         setLogDesc("");
         setLogPic("");
         setLogStatus("pending");
+        setSelectedMaintLogId("");
+        setIsCreateMaintLogOpen(false);
       },
     });
   };
@@ -252,6 +329,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
         setInvIssueDate("");
         setInvDueDate("");
         setInvDoc("");
+        setIsCreateInvoiceOpen(false);
       },
     });
   };
@@ -290,6 +368,9 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
         break;
       case "maintLog":
         deleteMaintLogMutation.mutate(id, options);
+        break;
+      case "maint":
+        deleteMaintMutation.mutate(id, options);
         break;
       case "invoice":
         deleteInvoiceMutation.mutate(id, options);
@@ -495,82 +576,29 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
 
               {/* Progress Tab */}
               {activeTab === "progress" && (
-                <div className="grid gap-6 md:grid-cols-[300px_1fr]">
-                  {/* Create progress form */}
-                  <div className="rounded-lg border border-border bg-card p-5 h-fit">
-                    <h3 className="text-md font-extrabold text-foreground mb-4">
-                      Tambah Milestone Timeline
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-extrabold text-foreground flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-primary" />
+                      Timeline Milestone Progres
                     </h3>
-                    <form onSubmit={handleAddMilestone} className="space-y-4">
-                      <FieldGroup className="space-y-3">
-                        <Field className="space-y-1">
-                          <FieldLabel htmlFor="prog-title">Nama Milestone</FieldLabel>
-                          <Input
-                            id="prog-title"
-                            type="text"
-                            required
-                            value={milestoneTitle}
-                            onChange={(e) => setMilestoneTitle(e.target.value)}
-                            placeholder="Requirement Gathering"
-                          />
-                        </Field>
-                        <Field className="space-y-1">
-                          <FieldLabel htmlFor="prog-status">Status</FieldLabel>
-                          <Select
-                            id="prog-status"
-                            value={milestoneStatus}
-                            onChange={(e) => setMilestoneStatus(e.target.value)}
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="completed">Completed</option>
-                          </Select>
-                        </Field>
-                        <Field className="space-y-1">
-                          <FieldLabel htmlFor="prog-percent">Persentase ({milestonePercent}%)</FieldLabel>
-                          <Input
-                            id="prog-percent"
-                            type="number"
-                            required
-                            min="0"
-                            max="100"
-                            value={milestonePercent}
-                            onChange={(e) => setMilestonePercent(Number(e.target.value))}
-                          />
-                        </Field>
-                        <Field className="space-y-1">
-                          <FieldLabel htmlFor="prog-notes">Catatan Perkembangan</FieldLabel>
-                          <Textarea
-                            id="prog-notes"
-                            value={milestoneNotes}
-                            onChange={(e) => setMilestoneNotes(e.target.value)}
-                            placeholder="Catatan update progress"
-                          />
-                        </Field>
-                        <Field className="space-y-1">
-                          <FieldLabel htmlFor="prog-doc">Lampiran Dokumen PDF (URL)</FieldLabel>
-                          <Input
-                            id="prog-doc"
-                            type="text"
-                            value={milestoneDoc}
-                            onChange={(e) => setMilestoneDoc(e.target.value)}
-                            placeholder="https://s3.bucket/path.pdf"
-                          />
-                        </Field>
-                      </FieldGroup>
-                      <Button
-                        type="submit"
-                        disabled={createProgressMutation.isPending}
-                        className="w-full justify-center cursor-pointer font-bold"
-                      >
-                        Tambah Progress
-                      </Button>
-                    </form>
+                    <button
+                      onClick={() => {
+                        setMilestoneTitle("");
+                        setMilestoneNotes("");
+                        setMilestoneDoc("");
+                        setMilestonePercent(0);
+                        setMilestoneStatus("pending");
+                        setIsCreateProgressOpen(true);
+                      }}
+                      className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                    >
+                      Tambah Milestone
+                    </button>
                   </div>
 
                   {/* Milestones list */}
                   <div className="space-y-4">
-                    <h3 className="text-md font-extrabold text-foreground">Timeline Progres Saat Ini</h3>
                     {data?.progress && data.progress.length > 0 ? (
                       <div className="space-y-3">
                         {data.progress.map((p: any) => (
@@ -585,16 +613,32 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                               </div>
                               <p className="text-[11px] text-muted-foreground">Tgl: {p.updateDate}</p>
                               {p.notes && <p className="text-xs text-muted-foreground mt-2">{p.notes}</p>}
+                              {p.documentUrl && (
+                                <a
+                                  href={p.documentUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-block mt-2 text-xs text-primary hover:underline font-bold"
+                                >
+                                  Lampiran PDF
+                                </a>
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-bold uppercase rounded-full px-2 py-0.5 bg-primary/10 text-primary">
                                 {p.status}
                               </span>
                               <button
-                                onClick={() => handleDeleteTrigger("progress", p.id, p.title)}
-                                className="text-muted-foreground hover:text-destructive cursor-pointer p-1"
+                                onClick={() => handleEditProgressTrigger(p)}
+                                className="inline-flex min-h-7 items-center justify-center rounded bg-secondary px-2 py-1 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTrigger("progress", p.id, p.title)}
+                                className="inline-flex min-h-7 items-center justify-center rounded bg-secondary px-2 py-1 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
+                              >
+                                Hapus
                               </button>
                             </div>
                           </div>
@@ -611,48 +655,23 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
 
               {/* Documents Tab */}
               {activeTab === "docs" && (
-                <div className="grid gap-6 md:grid-cols-[300px_1fr]">
-                  {/* Create document form */}
-                  <div className="rounded-lg border border-border bg-card p-5 h-fit">
-                    <h3 className="text-md font-extrabold text-foreground mb-4">Upload Dokumen Deliverable</h3>
-                    <form onSubmit={handleAddDocument} className="space-y-4">
-                      <FieldGroup className="space-y-3">
-                        <Field className="space-y-1">
-                          <FieldLabel htmlFor="doc-title">Nama Dokumen</FieldLabel>
-                          <Input
-                            id="doc-title"
-                            type="text"
-                            required
-                            value={docTitle}
-                            onChange={(e) => setDocTitle(e.target.value)}
-                            placeholder="User Manual App v1.0"
-                          />
-                        </Field>
-                        <Field className="space-y-1">
-                          <FieldLabel htmlFor="doc-url">Dokumen URL (S3/PDF Link)</FieldLabel>
-                          <Input
-                            id="doc-url"
-                            type="text"
-                            required
-                            value={docUrl}
-                            onChange={(e) => setDocUrl(e.target.value)}
-                            placeholder="https://s3.bucket/manual.pdf"
-                          />
-                        </Field>
-                      </FieldGroup>
-                      <Button
-                        type="submit"
-                        disabled={createDocMutation.isPending}
-                        className="w-full justify-center cursor-pointer font-bold"
-                      >
-                        Unggah Dokumen
-                      </Button>
-                    </form>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-md font-extrabold text-foreground">Dokumen Serah Terima & Manual</h3>
+                    <button
+                      onClick={() => {
+                        setDocTitle("");
+                        setDocUrl("");
+                        setIsCreateDocOpen(true);
+                      }}
+                      className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                    >
+                      Unggah Dokumen Baru
+                    </button>
                   </div>
 
                   {/* Documents list */}
                   <div className="space-y-4">
-                    <h3 className="text-md font-extrabold text-foreground">Dokumen Proyek Terupload</h3>
                     {data?.documents && data.documents.length > 0 ? (
                       <div className="divide-y divide-border/60 rounded-lg border border-border bg-card px-4">
                         {data.documents.map((d: any) => (
@@ -674,9 +693,9 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                               </a>
                               <button
                                 onClick={() => handleDeleteTrigger("document", d.id, d.title)}
-                                className="text-muted-foreground hover:text-destructive cursor-pointer p-1"
+                                className="inline-flex min-h-7 items-center justify-center rounded bg-secondary px-2 py-1 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                Hapus
                               </button>
                             </div>
                           </div>
@@ -694,324 +713,647 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
               {/* Maintenance Tab */}
               {activeTab === "maintenance" && (
                 <div className="space-y-6">
-                  {/* Quota setup form */}
-                  <div className="rounded-lg border border-border bg-card p-5">
-                    <h3 className="text-md font-extrabold text-foreground pb-2 border-b border-border/60 mb-4">
-                      Konfigurasi Kuota Maintenance Proyek
-                    </h3>
-                    <form onSubmit={handleSaveMaintenance} className="grid gap-4 sm:grid-cols-2">
-                      <Field className="space-y-1 sm:col-span-2">
-                        <FieldLabel htmlFor="maint-pack">Jenis Paket Maintenance</FieldLabel>
-                        <Input
-                          id="maint-pack"
-                          type="text"
-                          required
-                          value={maintPackage}
-                          onChange={(e) => setMaintPackage(e.target.value)}
-                          placeholder="Paket Standard 12 Request/Tahun"
-                        />
-                      </Field>
-                      <Field className="space-y-1">
-                        <FieldLabel htmlFor="maint-start">Tanggal Mulai Aktif</FieldLabel>
-                        <Input
-                          id="maint-start"
-                          type="date"
-                          required
-                          value={maintStart}
-                          onChange={(e) => setMaintStart(e.target.value)}
-                        />
-                      </Field>
-                      <Field className="space-y-1">
-                        <FieldLabel htmlFor="maint-end">Tanggal Akhir Aktif</FieldLabel>
-                        <Input
-                          id="maint-end"
-                          type="date"
-                          required
-                          value={maintEnd}
-                          onChange={(e) => setMaintEnd(e.target.value)}
-                        />
-                      </Field>
-                      <Field className="space-y-1">
-                        <FieldLabel htmlFor="maint-limit">Batas Kuota Layanan (Jumlah Request)</FieldLabel>
-                        <Input
-                          id="maint-limit"
-                          type="number"
-                          required
-                          value={maintLimit}
-                          onChange={(e) => setMaintLimit(Number(e.target.value))}
-                        />
-                      </Field>
-                      <div className="sm:col-span-2 flex justify-end">
-                        <Button
-                          type="submit"
-                          disabled={saveMaintMutation.isPending}
-                          className="cursor-pointer font-bold inline-flex items-center gap-2"
-                        >
-                          <Save className="h-4 w-4" />
-                          Simpan Paket
-                        </Button>
-                      </div>
-                    </form>
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-md font-extrabold text-foreground">Daftar Paket Maintenance</h3>
+                    <button
+                      onClick={() => {
+                        setEditingMaintItem(null);
+                        setMaintPackage("");
+                        setMaintStart("");
+                        setMaintEnd("");
+                        setMaintLimit(12);
+                        setIsMaintSetupOpen(true);
+                      }}
+                      className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                    >
+                      Tambah Paket Maintenance
+                    </button>
                   </div>
 
-                  {/* Audit usage & Log usage creation */}
-                  <div className="grid gap-6 md:grid-cols-[300px_1fr]">
-                    <div className="rounded-lg border border-border bg-card p-5 h-fit">
-                      <h3 className="text-md font-extrabold text-foreground mb-4">Catat Request Maintenance</h3>
-                      <form onSubmit={handleAddMaintLog} className="space-y-4">
-                        <FieldGroup className="space-y-3">
-                          <Field className="space-y-1">
-                            <FieldLabel htmlFor="log-desc">Deskripsi Kerja</FieldLabel>
-                            <Textarea
-                              id="log-desc"
-                              required
-                              value={logDesc}
-                              onChange={(e) => setLogDesc(e.target.value)}
-                              placeholder="Perbaikan bug crash tombol payment"
-                            />
-                          </Field>
-                          <Field className="space-y-1">
-                            <FieldLabel htmlFor="log-status">Status Pengerjaan</FieldLabel>
-                            <Select
-                              id="log-status"
-                              value={logStatus}
-                              onChange={(e) => setLogStatus(e.target.value)}
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="in_progress">In Progress</option>
-                              <option value="completed">Completed</option>
-                            </Select>
-                          </Field>
-                          <Field className="space-y-1">
-                            <FieldLabel htmlFor="log-pic">PIC Handler Internal</FieldLabel>
-                            <Input
-                              id="log-pic"
-                              type="text"
-                              required
-                              value={logPic}
-                              onChange={(e) => setLogPic(e.target.value)}
-                              placeholder="Fikri GiLabs"
-                            />
-                          </Field>
-                        </FieldGroup>
-                        <Button
-                          type="submit"
-                          disabled={createMaintLogMutation.isPending}
-                          className="w-full justify-center cursor-pointer font-bold"
-                        >
-                          Catat Request
-                        </Button>
-                      </form>
+                  {data?.maintenance && data.maintenance.length > 0 ? (
+                    <div className="space-y-4">
+                      {data.maintenance.map((m: any) => (
+                        <div key={m.id} className="rounded-lg border border-border bg-card p-5">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600">
+                                Paket Terdaftar
+                              </span>
+                              <h3 className="text-lg font-extrabold text-foreground mt-1">
+                                {m.packageName}
+                              </h3>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setEditingMaintItem(m);
+                                  setMaintPackage(m.packageName);
+                                  setMaintStart(m.startDate);
+                                  setMaintEnd(m.endDate);
+                                  setMaintLimit(m.quotaLimit);
+                                  setIsMaintSetupOpen(true);
+                                }}
+                                className="inline-flex min-h-8 items-center justify-center rounded bg-secondary px-2.5 py-1 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTrigger("maint", m.id, m.packageName)}
+                                className="inline-flex min-h-8 items-center justify-center rounded bg-destructive/10 text-destructive hover:bg-destructive/20 px-2.5 py-1 text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                Hapus
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="mt-5">
+                            <div className="flex justify-between text-sm text-muted-foreground mb-1.5">
+                              <span>Pemakaian kuota maintenance tahunan</span>
+                              <span className="font-extrabold text-foreground">
+                                {m.quotaUsed} / {m.quotaLimit} Request
+                              </span>
+                            </div>
+                            <div className="h-3 w-full rounded-full bg-border overflow-hidden">
+                              <div
+                                className="h-full bg-teal-500 rounded-full transition-all duration-500"
+                                style={{
+                                  width: `${Math.min(
+                                    (m.quotaUsed / m.quotaLimit) * 100,
+                                    100
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex flex-col sm:flex-row justify-between gap-2 text-xs text-muted-foreground border-t border-border/60 pt-4">
+                            <span>Sisa Kuota: <strong>{m.quotaLimit - m.quotaUsed} request</strong></span>
+                            <span>Periode Aktif: {m.startDate} s/d {m.endDate}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-border bg-card p-5 text-center text-muted-foreground">
+                      Project ini belum memiliki paket maintenance yang terdaftar.
+                    </div>
+                  )}
+
+                  {/* Audit Logs Usage */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-md font-extrabold text-foreground">Histori Log Pemakaian Maintenance</h3>
+                      <button
+                        onClick={() => {
+                          setLogDesc("");
+                          setLogPic("");
+                          setLogStatus("pending");
+                          const firstMaint = data?.maintenance?.[0];
+                          setSelectedMaintLogId(firstMaint?.id ?? "");
+                          setIsCreateMaintLogOpen(true);
+                        }}
+                        className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                      >
+                        Catat Request Pengerjaan
+                      </button>
                     </div>
 
-                    {/* Audit Logs Trail */}
-                    <div className="space-y-4">
-                      <h3 className="text-md font-extrabold text-foreground">Histori Log Pemakaian Maintenance</h3>
-                      {data?.maintLogs && data.maintLogs.length > 0 ? (
-                        <div className="space-y-3">
-                          {data.maintLogs.map((l: any) => (
-                            <div
-                              key={l.id}
-                              className="rounded-lg border border-border bg-card p-4 flex justify-between items-start gap-4 transition-all hover:shadow-sm"
-                            >
-                              <div>
-                                <h4 className="text-sm font-extrabold text-foreground">{l.description}</h4>
-                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-1">
-                                  <span>Tanggal: {l.requestDate}</span>
-                                  <span>·</span>
-                                  <span>PIC: {l.picName}</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold uppercase rounded-full px-2 py-0.5 bg-primary/10 text-primary">
-                                  {l.status}
-                                </span>
-                                <button
-                                  onClick={() => handleDeleteTrigger("maintLog", l.id, l.description)}
-                                  className="text-muted-foreground hover:text-destructive cursor-pointer p-1"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                    {data?.maintLogs && data.maintLogs.length > 0 ? (
+                      <div className="space-y-3">
+                        {data.maintLogs.map((l: any) => (
+                          <div
+                            key={l.id}
+                            className="rounded-lg border border-border bg-card p-4 flex justify-between items-start gap-4 transition-all hover:shadow-sm"
+                          >
+                            <div>
+                              <h4 className="text-sm font-extrabold text-foreground">{l.description}</h4>
+                              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-1">
+                                <span>Tanggal: {l.requestDate}</span>
+                                <span>·</span>
+                                <span>PIC: {l.picName}</span>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground">
-                          Belum ada histori pengerjaan maintenance tercatat.
-                        </div>
-                      )}
-                    </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold uppercase rounded-full px-2 py-0.5 bg-primary/10 text-primary">
+                                {l.status}
+                              </span>
+                              <button
+                                onClick={() => handleDeleteTrigger("maintLog", l.id, l.description)}
+                                className="inline-flex min-h-7 items-center justify-center rounded bg-secondary px-2 py-1 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
+                              >
+                                Hapus
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground">
+                        Belum ada histori pengerjaan maintenance tercatat.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
               {/* Invoice Tab */}
               {activeTab === "invoice" && (
-                <div className="grid gap-6 md:grid-cols-[300px_1fr]">
-                  {/* Create Invoice Form */}
-                  <div className="rounded-lg border border-border bg-card p-5 h-fit">
-                    <h3 className="text-md font-extrabold text-foreground mb-4">Terbitkan Invoice Baru</h3>
-                    <form onSubmit={handleAddInvoice} className="space-y-4">
-                      <FieldGroup className="space-y-3">
-                        <Field className="space-y-1">
-                          <FieldLabel htmlFor="inv-num">No. Invoice</FieldLabel>
-                          <Input
-                            id="inv-num"
-                            type="text"
-                            required
-                            value={invNum}
-                            onChange={(e) => setInvNum(e.target.value)}
-                            placeholder="INV/GILABS/2026/012"
-                          />
-                        </Field>
-                        <Field className="space-y-1">
-                          <FieldLabel htmlFor="inv-amount">Nominal Jumlah (Rp)</FieldLabel>
-                          <Input
-                            id="inv-amount"
-                            type="number"
-                            required
-                            value={invAmount}
-                            onChange={(e) => setInvAmount(Number(e.target.value))}
-                          />
-                        </Field>
-                        <Field className="space-y-1">
-                          <FieldLabel htmlFor="inv-status">Status</FieldLabel>
-                          <Select
-                            id="inv-status"
-                            value={invStatus}
-                            onChange={(e) => setInvStatus(e.target.value)}
-                          >
-                            <option value="draft">Draft</option>
-                            <option value="sent">Sent</option>
-                            <option value="waiting_payment">Waiting Payment</option>
-                            <option value="paid">Paid</option>
-                            <option value="overdue">Overdue</option>
-                          </Select>
-                        </Field>
-                        <Field className="space-y-1">
-                          <FieldLabel htmlFor="inv-issue">Tanggal Terbit</FieldLabel>
-                          <Input
-                            id="inv-issue"
-                            type="date"
-                            required
-                            value={invIssueDate}
-                            onChange={(e) => setInvIssueDate(e.target.value)}
-                          />
-                        </Field>
-                        <Field className="space-y-1">
-                          <FieldLabel htmlFor="inv-due">Tanggal Jatuh Tempo</FieldLabel>
-                          <Input
-                            id="inv-due"
-                            type="date"
-                            required
-                            value={invDueDate}
-                            onChange={(e) => setInvDueDate(e.target.value)}
-                          />
-                        </Field>
-                        <Field className="space-y-1">
-                          <FieldLabel htmlFor="inv-doc">PDF Invoice Document (URL)</FieldLabel>
-                          <Input
-                            id="inv-doc"
-                            type="text"
-                            value={invDoc}
-                            onChange={(e) => setInvDoc(e.target.value)}
-                            placeholder="https://s3.bucket/inv.pdf"
-                          />
-                        </Field>
-                      </FieldGroup>
-                      <Button
-                        type="submit"
-                        disabled={createInvoiceMutation.isPending}
-                        className="w-full justify-center cursor-pointer font-bold"
-                      >
-                        Terbitkan Invoice
-                      </Button>
-                    </form>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-md font-extrabold text-foreground">Daftar Tagihan Invoice</h3>
+                    <button
+                      onClick={() => {
+                        setInvNum("");
+                        setInvAmount(0);
+                        setInvStatus("draft");
+                        setInvIssueDate("");
+                        setInvDueDate("");
+                        setInvDoc("");
+                        setIsCreateInvoiceOpen(true);
+                      }}
+                      className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                    >
+                      Terbitkan Invoice Baru
+                    </button>
                   </div>
 
-                  {/* Invoices List */}
-                  <div className="space-y-4">
-                    <h3 className="text-md font-extrabold text-foreground">Daftar Tagihan Invoice</h3>
-                    {data?.invoices && data.invoices.length > 0 ? (
-                      <div className="rounded-lg border border-border bg-card overflow-hidden">
-                        <ScrollArea orientation="horizontal">
-                          <table className="w-full min-w-[600px] border-collapse text-left text-sm">
-                            <thead className="bg-secondary text-xs uppercase text-muted-foreground">
-                              <tr>
-                                <th className="border-b border-border px-4 py-3">No. Invoice</th>
-                                <th className="border-b border-border px-4 py-3">Nominal</th>
-                                <th className="border-b border-border px-4 py-3">Status</th>
-                                <th className="border-b border-border px-4 py-3">Jatuh Tempo</th>
-                                <th className="border-b border-border px-4 py-3 text-right">Aksi</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {data.invoices.map((inv: any) => (
-                                <tr
-                                  key={inv.id}
-                                  className="align-middle hover:bg-secondary/40 transition-colors"
-                                >
-                                  <td className="border-b border-border px-4 py-3 font-semibold text-foreground">
-                                    {inv.invoiceNumber}
-                                  </td>
-                                  <td className="border-b border-border px-4 py-3 text-foreground font-semibold">
-                                    {formatCurrency(inv.amount)}
-                                  </td>
-                                  <td className="border-b border-border px-4 py-3">
-                                    <select
-                                      value={inv.status}
-                                      onChange={(e) => handleUpdateInvoiceStatus(inv.id, e.target.value)}
-                                      className="rounded border border-border bg-background px-2 py-1 text-xs cursor-pointer focus:outline-none"
-                                    >
-                                      <option value="draft">Draft</option>
-                                      <option value="sent">Sent</option>
-                                      <option value="waiting_payment">Waiting Payment</option>
-                                      <option value="paid">Paid</option>
-                                      <option value="overdue">Overdue</option>
-                                    </select>
-                                  </td>
-                                  <td className="border-b border-border px-4 py-3 text-muted-foreground">
-                                    {inv.dueDate}
-                                  </td>
-                                  <td className="border-b border-border px-4 py-3 text-right">
-                                    <div className="flex justify-end gap-2">
-                                      {inv.documentUrl && (
-                                        <a
-                                          href={inv.documentUrl}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="inline-flex min-h-7 items-center justify-center rounded bg-secondary px-2 text-xs font-bold text-foreground hover:bg-border cursor-pointer"
-                                        >
-                                          PDF
-                                        </a>
-                                      )}
-                                      <button
-                                        onClick={() => handleDeleteTrigger("invoice", inv.id, inv.invoiceNumber)}
-                                        className="text-muted-foreground hover:text-destructive cursor-pointer p-1"
+                  {data?.invoices && data.invoices.length > 0 ? (
+                    <div className="rounded-lg border border-border bg-card overflow-hidden">
+                      <ScrollArea orientation="horizontal">
+                        <table className="w-full min-w-[600px] border-collapse text-left text-sm">
+                          <thead className="bg-secondary text-xs uppercase text-muted-foreground">
+                            <tr>
+                              <th className="border-b border-border px-4 py-3">No. Invoice</th>
+                              <th className="border-b border-border px-4 py-3">Nominal</th>
+                              <th className="border-b border-border px-4 py-3">Status</th>
+                              <th className="border-b border-border px-4 py-3">Jatuh Tempo</th>
+                              <th className="border-b border-border px-4 py-3 text-right">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {data.invoices.map((inv: any) => (
+                              <tr
+                                key={inv.id}
+                                className="align-middle hover:bg-secondary/40 transition-colors"
+                              >
+                                <td className="border-b border-border px-4 py-3 font-semibold text-foreground">
+                                  {inv.invoiceNumber}
+                                </td>
+                                <td className="border-b border-border px-4 py-3 text-foreground font-semibold">
+                                  {formatCurrency(inv.amount)}
+                                </td>
+                                <td className="border-b border-border px-4 py-3">
+                                  <select
+                                    value={inv.status}
+                                    onChange={(e) => handleUpdateInvoiceStatus(inv.id, e.target.value)}
+                                    className="rounded border border-border bg-background px-2 py-1 text-xs cursor-pointer focus:outline-none"
+                                  >
+                                    <option value="draft">Draft</option>
+                                    <option value="sent">Sent</option>
+                                    <option value="waiting_payment">Waiting Payment</option>
+                                    <option value="paid">Paid</option>
+                                    <option value="overdue">Overdue</option>
+                                  </select>
+                                </td>
+                                <td className="border-b border-border px-4 py-3 text-muted-foreground">
+                                  {inv.dueDate}
+                                </td>
+                                <td className="border-b border-border px-4 py-3 text-right">
+                                  <div className="flex justify-end gap-2">
+                                    {inv.documentUrl && (
+                                      <a
+                                        href={inv.documentUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex min-h-7 items-center justify-center rounded bg-secondary px-2 text-xs font-bold text-foreground hover:bg-border cursor-pointer"
                                       >
-                                        <Trash2 className="h-4 w-4" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </ScrollArea>
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground">
-                        Belum ada invoice diterbitkan.
-                      </div>
-                    )}
-                  </div>
+                                        PDF
+                                      </a>
+                                    )}
+                                    <button
+                                      onClick={() => handleDeleteTrigger("invoice", inv.id, inv.invoiceNumber)}
+                                      className="inline-flex min-h-7 items-center justify-center rounded bg-secondary px-2 py-1 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
+                                    >
+                                      Hapus
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </ScrollArea>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground">
+                      Belum ada invoice diterbitkan.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
         )}
       </div>
+
+      {/* Dialog Overlays */}
+
+      {/* Create Progress Milestone Dialog */}
+      {isCreateProgressOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
+          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+            <h2 className="text-xl font-extrabold text-foreground">Tambah Milestone</h2>
+            <form onSubmit={handleAddMilestone} className="mt-4 space-y-4">
+              <FieldGroup className="space-y-3">
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="prog-title">Nama Milestone</FieldLabel>
+                  <Input
+                    id="prog-title"
+                    type="text"
+                    required
+                    value={milestoneTitle}
+                    onChange={(e) => setMilestoneTitle(e.target.value)}
+                    placeholder="Requirement Gathering"
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="prog-status">Status</FieldLabel>
+                  <Select
+                    id="prog-status"
+                    value={milestoneStatus}
+                    onChange={(e) => setMilestoneStatus(e.target.value)}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                  </Select>
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="prog-percent">Persentase ({milestonePercent}%)</FieldLabel>
+                  <Input
+                    id="prog-percent"
+                    type="number"
+                    required
+                    min="0"
+                    max="100"
+                    value={milestonePercent}
+                    onChange={(e) => setMilestonePercent(Number(e.target.value))}
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="prog-notes">Catatan</FieldLabel>
+                  <Textarea
+                    id="prog-notes"
+                    value={milestoneNotes}
+                    onChange={(e) => setMilestoneNotes(e.target.value)}
+                    placeholder="Catatan pengerjaan"
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel>Lampiran PDF Dokumen</FieldLabel>
+                  <FileUpload
+                    value={milestoneDoc}
+                    onChange={setMilestoneDoc}
+                  />
+                </Field>
+              </FieldGroup>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button type="button" variant="secondary" onClick={() => setIsCreateProgressOpen(false)}>
+                  Batal
+                </Button>
+                <Button type="submit" isLoading={createProgressMutation.isPending}>
+                  Tambah
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Progress Milestone Dialog */}
+      {isEditProgressOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
+          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+            <h2 className="text-xl font-extrabold text-foreground">Edit Milestone</h2>
+            <form onSubmit={handleUpdateMilestone} className="mt-4 space-y-4">
+              <FieldGroup className="space-y-3">
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="edit-prog-title">Nama Milestone</FieldLabel>
+                  <Input
+                    id="edit-prog-title"
+                    type="text"
+                    required
+                    value={milestoneTitle}
+                    onChange={(e) => setMilestoneTitle(e.target.value)}
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="edit-prog-status">Status</FieldLabel>
+                  <Select
+                    id="edit-prog-status"
+                    value={milestoneStatus}
+                    onChange={(e) => setMilestoneStatus(e.target.value)}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                  </Select>
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="edit-prog-percent">Persentase ({milestonePercent}%)</FieldLabel>
+                  <Input
+                    id="edit-prog-percent"
+                    type="number"
+                    required
+                    min="0"
+                    max="100"
+                    value={milestonePercent}
+                    onChange={(e) => setMilestonePercent(Number(e.target.value))}
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="edit-prog-notes">Catatan</FieldLabel>
+                  <Textarea
+                    id="edit-prog-notes"
+                    value={milestoneNotes}
+                    onChange={(e) => setMilestoneNotes(e.target.value)}
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel>Lampiran PDF Dokumen</FieldLabel>
+                  <FileUpload
+                    value={milestoneDoc}
+                    onChange={setMilestoneDoc}
+                  />
+                </Field>
+              </FieldGroup>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button type="button" variant="secondary" onClick={() => setIsEditProgressOpen(false)}>
+                  Batal
+                </Button>
+                <Button type="submit" isLoading={updateProgressMutation.isPending}>
+                  Simpan
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Document Dialog */}
+      {isCreateDocOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
+          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+            <h2 className="text-xl font-extrabold text-foreground">Upload Dokumen</h2>
+            <form onSubmit={handleAddDocument} className="mt-4 space-y-4">
+              <FieldGroup className="space-y-3">
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="doc-title">Nama Dokumen</FieldLabel>
+                  <Input
+                    id="doc-title"
+                    type="text"
+                    required
+                    value={docTitle}
+                    onChange={(e) => setDocTitle(e.target.value)}
+                    placeholder="User Manual App v1.0"
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel>File Dokumen PDF</FieldLabel>
+                  <FileUpload
+                    value={docUrl}
+                    onChange={setDocUrl}
+                  />
+                </Field>
+              </FieldGroup>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button type="button" variant="secondary" onClick={() => setIsCreateDocOpen(false)}>
+                  Batal
+                </Button>
+                <Button type="submit" isLoading={createDocMutation.isPending}>
+                  Unggah
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Configure Maintenance Dialog */}
+      {isMaintSetupOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
+          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+            <h2 className="text-xl font-extrabold text-foreground">Konfigurasi Maintenance</h2>
+            <form onSubmit={handleSaveMaintenance} className="mt-4 space-y-4">
+              <FieldGroup className="space-y-3">
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="maint-pack">Jenis Paket Maintenance</FieldLabel>
+                  <Input
+                    id="maint-pack"
+                    type="text"
+                    required
+                    value={maintPackage}
+                    onChange={(e) => setMaintPackage(e.target.value)}
+                    placeholder="Paket Standard 12 Request/Tahun"
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="maint-start">Tanggal Mulai</FieldLabel>
+                  <Input
+                    id="maint-start"
+                    type="date"
+                    required
+                    value={maintStart}
+                    onChange={(e) => setMaintStart(e.target.value)}
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="maint-end">Tanggal Akhir</FieldLabel>
+                  <Input
+                    id="maint-end"
+                    type="date"
+                    required
+                    value={maintEnd}
+                    onChange={(e) => setMaintEnd(e.target.value)}
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="maint-limit">Batas Kuota Layanan (Jumlah Request)</FieldLabel>
+                  <Input
+                    id="maint-limit"
+                    type="number"
+                    required
+                    value={maintLimit}
+                    onChange={(e) => setMaintLimit(Number(e.target.value))}
+                  />
+                </Field>
+              </FieldGroup>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button type="button" variant="secondary" onClick={() => setIsMaintSetupOpen(false)}>
+                  Batal
+                </Button>
+                <Button type="submit" isLoading={createMaintMutation.isPending || updateMaintMutation.isPending}>
+                  Simpan
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Log Maintenance Request Dialog */}
+      {isCreateMaintLogOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
+          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+            <h2 className="text-xl font-extrabold text-foreground">Catat Request Maintenance</h2>
+            <form onSubmit={handleAddMaintLog} className="mt-4 space-y-4">
+              <FieldGroup className="space-y-3">
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="log-maint-select">Pilih Paket Maintenance</FieldLabel>
+                  <Select
+                    id="log-maint-select"
+                    required
+                    value={selectedMaintLogId}
+                    onChange={(e) => setSelectedMaintLogId(e.target.value)}
+                  >
+                    <option value="">-- Pilih Paket --</option>
+                    {data?.maintenance?.map((m: any) => (
+                      <option key={m.id} value={m.id}>
+                        {m.packageName} (Sisa: {m.quotaLimit - m.quotaUsed} request)
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="log-desc">Deskripsi Kerja</FieldLabel>
+                  <Textarea
+                    id="log-desc"
+                    required
+                    value={logDesc}
+                    onChange={(e) => setLogDesc(e.target.value)}
+                    placeholder="Perbaikan bug crash tombol payment"
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="log-status">Status Pengerjaan</FieldLabel>
+                  <Select
+                    id="log-status"
+                    value={logStatus}
+                    onChange={(e) => setLogStatus(e.target.value)}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                  </Select>
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="log-pic">PIC Internal Handler</FieldLabel>
+                  <Input
+                    id="log-pic"
+                    type="text"
+                    required
+                    value={logPic}
+                    onChange={(e) => setLogPic(e.target.value)}
+                    placeholder="Fikri GiLabs"
+                  />
+                </Field>
+              </FieldGroup>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button type="button" variant="secondary" onClick={() => setIsCreateMaintLogOpen(false)}>
+                  Batal
+                </Button>
+                <Button type="submit" isLoading={createMaintLogMutation.isPending}>
+                  Catat
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Invoice Dialog */}
+      {isCreateInvoiceOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
+          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+            <h2 className="text-xl font-extrabold text-foreground">Terbitkan Invoice</h2>
+            <form onSubmit={handleAddInvoice} className="mt-4 space-y-4">
+              <FieldGroup className="space-y-3">
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="inv-num">No. Invoice</FieldLabel>
+                  <Input
+                    id="inv-num"
+                    type="text"
+                    required
+                    value={invNum}
+                    onChange={(e) => setInvNum(e.target.value)}
+                    placeholder="INV/GILABS/2026/012"
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="inv-amount">Nominal (Rp)</FieldLabel>
+                  <Input
+                    id="inv-amount"
+                    type="number"
+                    required
+                    value={invAmount}
+                    onChange={(e) => setInvAmount(Number(e.target.value))}
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="inv-status">Status</FieldLabel>
+                  <Select
+                    id="inv-status"
+                    value={invStatus}
+                    onChange={(e) => setInvStatus(e.target.value)}
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="sent">Sent</option>
+                    <option value="waiting_payment">Waiting Payment</option>
+                    <option value="paid">Paid</option>
+                    <option value="overdue">Overdue</option>
+                  </Select>
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="inv-issue">Tanggal Terbit</FieldLabel>
+                  <Input
+                    id="inv-issue"
+                    type="date"
+                    required
+                    value={invIssueDate}
+                    onChange={(e) => setInvIssueDate(e.target.value)}
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel htmlFor="inv-due">Tanggal Jatuh Tempo</FieldLabel>
+                  <Input
+                    id="inv-due"
+                    type="date"
+                    required
+                    value={invDueDate}
+                    onChange={(e) => setInvDueDate(e.target.value)}
+                  />
+                </Field>
+                <Field className="space-y-1">
+                  <FieldLabel>Dokumen PDF Invoice</FieldLabel>
+                  <FileUpload
+                    value={invDoc}
+                    onChange={setInvDoc}
+                  />
+                </Field>
+              </FieldGroup>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button type="button" variant="secondary" onClick={() => setIsCreateInvoiceOpen(false)}>
+                  Batal
+                </Button>
+                <Button type="submit" isLoading={createInvoiceMutation.isPending}>
+                  Terbitkan
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Unified delete confirmation dialog overlay */}
       <DeleteDialog

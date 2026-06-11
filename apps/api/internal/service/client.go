@@ -157,6 +157,42 @@ func (s *ClientProjectService) CreateProgress(ctx context.Context, projectID str
 	return progress, nil
 }
 
+func (s *ClientProjectService) UpdateProgress(ctx context.Context, projectID string, progressID string, progress domain.ProjectProgress) (domain.ProjectProgress, error) {
+	p, err := s.store.GetProjectByID(ctx, projectID)
+	if err != nil {
+		return domain.ProjectProgress{}, err
+	}
+
+	progress.ID = progressID
+	progress.ProjectID = projectID
+	if progress.UpdateDate == "" {
+		progress.UpdateDate = time.Now().Format("2006-01-02")
+	}
+
+	if err := s.store.UpdateProjectProgress(ctx, progress); err != nil {
+		return domain.ProjectProgress{}, err
+	}
+
+	client, err := s.store.GetUserByID(ctx, p.ClientID)
+	if err == nil && s.notifier != nil && s.notifier.Enabled() {
+		s.notifier.NotifyClientProjectProgress(ctx, client.Email, p.Name, progress.Title, string(progress.Status), progress.Percentage, progress.Notes, s.notifier.ClientProjectURL(projectID))
+	}
+
+	_ = s.store.CreateAuditLog(ctx, domain.AuditLog{
+		ID:         uuid.NewString(),
+		ActorID:    "system",
+		ActorName:  "Admin",
+		ActorRole:  "admin",
+		Action:     "UPDATE_PROGRESS",
+		TargetType: "project_progress",
+		TargetID:   progress.ID,
+		Details:    fmt.Sprintf("Milestone '%s' (%d%%) diperbarui pada project %s", progress.Title, progress.Percentage, p.Name),
+		CreatedAt:  time.Now().UTC(),
+	})
+
+	return progress, nil
+}
+
 func (s *ClientProjectService) CreateDocument(ctx context.Context, projectID string, doc domain.ProjectDocument) (domain.ProjectDocument, error) {
 	p, err := s.store.GetProjectByID(ctx, projectID)
 	if err != nil {
@@ -193,28 +229,63 @@ func (s *ClientProjectService) CreateDocument(ctx context.Context, projectID str
 	return doc, nil
 }
 
-func (s *ClientProjectService) CreateOrUpdateMaintenance(ctx context.Context, pm domain.ProjectMaintenance) (domain.ProjectMaintenance, error) {
+func (s *ClientProjectService) CreateMaintenance(ctx context.Context, pm domain.ProjectMaintenance) (domain.ProjectMaintenance, error) {
 	if pm.ProjectID == "" {
 		return domain.ProjectMaintenance{}, errors.New("project ID wajib diisi")
 	}
 
-	if pm.ID == "" {
-		pm.ID = uuid.NewString()
-		pm.CreatedAt = time.Now().UTC()
-	}
+	pm.ID = uuid.NewString()
+	pm.CreatedAt = time.Now().UTC()
 	pm.UpdatedAt = time.Now().UTC()
 
-	if err := s.store.CreateOrUpdateProjectMaintenance(ctx, pm); err != nil {
+	if err := s.store.CreateProjectMaintenance(ctx, pm); err != nil {
 		return domain.ProjectMaintenance{}, err
 	}
 
-	return s.store.GetProjectMaintenance(ctx, pm.ProjectID)
+	return pm, nil
 }
 
-func (s *ClientProjectService) CreateMaintenanceLog(ctx context.Context, projectID string, log domain.MaintenanceLog) (domain.MaintenanceLog, error) {
+func (s *ClientProjectService) UpdateMaintenance(ctx context.Context, id string, input domain.ProjectMaintenance) (domain.ProjectMaintenance, error) {
+	pm, err := s.store.GetProjectMaintenanceByID(ctx, id)
+	if err != nil {
+		return domain.ProjectMaintenance{}, err
+	}
+
+	if input.PackageName != "" {
+		pm.PackageName = input.PackageName
+	}
+	if input.StartDate != "" {
+		pm.StartDate = input.StartDate
+	}
+	if input.EndDate != "" {
+		pm.EndDate = input.EndDate
+	}
+	if input.QuotaLimit > 0 {
+		pm.QuotaLimit = input.QuotaLimit
+	}
+	pm.QuotaUsed = input.QuotaUsed
+	pm.UpdatedAt = time.Now().UTC()
+
+	if err := s.store.UpdateProjectMaintenance(ctx, pm); err != nil {
+		return domain.ProjectMaintenance{}, err
+	}
+
+	return pm, nil
+}
+
+func (s *ClientProjectService) DeleteMaintenance(ctx context.Context, id string) error {
+	return s.store.DeleteProjectMaintenance(ctx, id)
+}
+
+func (s *ClientProjectService) CreateMaintenanceLog(ctx context.Context, projectID string, log domain.MaintenanceLog, maintenanceID string) (domain.MaintenanceLog, error) {
 	p, err := s.store.GetProjectByID(ctx, projectID)
 	if err != nil {
 		return domain.MaintenanceLog{}, err
+	}
+
+	maint, err := s.store.GetProjectMaintenanceByID(ctx, maintenanceID)
+	if err != nil {
+		return domain.MaintenanceLog{}, errors.New("paket maintenance tidak ditemukan")
 	}
 
 	log.ID = uuid.NewString()
@@ -227,12 +298,14 @@ func (s *ClientProjectService) CreateMaintenanceLog(ctx context.Context, project
 		log.Status = domain.ProgressStatusPending
 	}
 
+	log.Description = fmt.Sprintf("[%s] %s", maint.PackageName, log.Description)
+
 	if err := s.store.CreateMaintenanceLog(ctx, log); err != nil {
 		return domain.MaintenanceLog{}, err
 	}
 
-	// Increment quota used by 1
-	_ = s.store.IncrementMaintenanceQuotaUsed(ctx, projectID, 1)
+	// Increment quota used by 1 for this specific package
+	_ = s.store.IncrementMaintenanceQuotaUsed(ctx, maintenanceID, 1)
 
 	// Notify client
 	client, err := s.store.GetUserByID(ctx, p.ClientID)

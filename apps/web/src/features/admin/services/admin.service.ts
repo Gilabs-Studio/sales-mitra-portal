@@ -108,6 +108,21 @@ export async function createOrUpdateProjectMaintenance(projectId: string, payloa
   return unwrapApiResponse(response.data);
 }
 
+export async function createProjectMaintenance(projectId: string, payload: any) {
+  const response = await apiClient.post<ApiEnvelope<any>>(`/admin/projects/${projectId}/maintenance`, payload);
+  return unwrapApiResponse(response.data);
+}
+
+export async function updateProjectMaintenance(projectId: string, maintId: string, payload: any) {
+  const response = await apiClient.patch<ApiEnvelope<any>>(`/admin/projects/${projectId}/maintenance/${maintId}`, payload);
+  return unwrapApiResponse(response.data);
+}
+
+export async function deleteProjectMaintenance(projectId: string, maintId: string) {
+  const response = await apiClient.delete<ApiEnvelope<any>>(`/admin/projects/${projectId}/maintenance/${maintId}`);
+  return unwrapApiResponse(response.data);
+}
+
 export async function createMaintenanceLog(projectId: string, payload: any) {
   const response = await apiClient.post<ApiEnvelope<any>>(`/admin/projects/${projectId}/maintenance-logs`, payload);
   return unwrapApiResponse(response.data);
@@ -130,5 +145,21 @@ export async function updateProjectInvoice(invoiceId: string, payload: any) {
 
 export async function deleteProjectInvoice(invoiceId: string) {
   const response = await apiClient.delete<ApiEnvelope<any>>(`/admin/projects/any/invoices/${invoiceId}`);
+  return unwrapApiResponse(response.data);
+}
+
+export async function uploadFile(file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await apiClient.post<ApiEnvelope<{ url: string }>>("/admin/upload", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return unwrapApiResponse(response.data);
+}
+
+export async function updateProjectProgress(projectId: string, progressId: string, payload: any) {
+  const response = await apiClient.patch<ApiEnvelope<any>>(`/admin/projects/${projectId}/progress/${progressId}`, payload);
   return unwrapApiResponse(response.data);
 }

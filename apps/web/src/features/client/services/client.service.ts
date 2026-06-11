@@ -30,7 +30,7 @@ export async function getProjectProgress(projectId: string) {
 }
 
 export async function getProjectMaintenance(projectId: string) {
-  const response = await apiClient.get<ApiEnvelope<ProjectMaintenance>>(`/client/projects/${projectId}/maintenance`);
+  const response = await apiClient.get<ApiEnvelope<ProjectMaintenance[]>>(`/client/projects/${projectId}/maintenance`);
   return unwrapApiResponse(response.data);
 }
 
@@ -56,5 +56,10 @@ export async function getProjectReportData(projectId: string) {
 
 export async function updateClientProfile(payload: { name: string; email: string; password?: string }) {
   const response = await apiClient.patch<ApiEnvelope<Record<string, never>>>("/client/profile", payload);
+  return unwrapApiResponse(response.data);
+}
+
+export async function createMaintenanceRequest(projectId: string, payload: { description: string; maintenanceId: string }) {
+  const response = await apiClient.post<ApiEnvelope<MaintenanceLog>>(`/client/projects/${projectId}/maintenance-requests`, payload);
   return unwrapApiResponse(response.data);
 }
