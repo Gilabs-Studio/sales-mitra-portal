@@ -160,6 +160,12 @@ export default async function HomePage({ params }: PageProps) {
 
           <div className="flex items-center gap-3">
             <Link
+              href="/client-portal"
+              className="hidden text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer sm:inline-flex"
+            >
+              Client Portal
+            </Link>
+            <Link
               href="/login"
               className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >

@@ -79,6 +79,7 @@ func NewRouter(
 	protected := api.Group("")
 	protected.Use(handler.requireAuth())
 	protected.GET("/me", handler.me)
+	protected.PATCH("/me/profile", handler.updateProfile)
 	protected.POST("/me/password-change", handler.changePassword)
 	protected.POST("/me/password-reset", handler.requestCurrentUserPasswordReset)
 	protected.GET("/knowledge", handler.knowledge)
@@ -120,6 +121,7 @@ func NewRouter(
 	admin.POST("/admins", requireRole(domain.RoleSuperAdmin), handler.createAdmin)
 	admin.GET("/clients", handler.adminClients)
 	admin.POST("/clients", handler.createClient)
+	admin.GET("/clients/:id", handler.adminClientDetail)
 	admin.POST("/clients/:id/invitation", handler.sendClientInvitation)
 	admin.GET("/client-projects", handler.adminClientProjects)
 	admin.POST("/client-projects", handler.createClientProject)
@@ -278,6 +280,22 @@ func (h Handler) changePassword(c *gin.Context) {
 	}
 
 	httpx.OK(c, "Password berhasil diperbarui", gin.H{})
+}
+
+func (h Handler) updateProfile(c *gin.Context) {
+	var input service.UpdateProfileInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload profil tidak valid", err.Error()))
+		return
+	}
+
+	user, err := h.authService.UpdateProfile(c.Request.Context(), currentUser(c).ID, input)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Profil berhasil diperbarui", user)
 }
 
 func (h Handler) serviceCatalog(c *gin.Context) {

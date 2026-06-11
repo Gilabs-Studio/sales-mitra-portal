@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gilabs/mitra-sales-portal/apps/api/internal/domain"
 	"github.com/gilabs/mitra-sales-portal/apps/api/internal/httpx"
 	"github.com/gilabs/mitra-sales-portal/apps/api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -38,6 +39,29 @@ func (h Handler) createClient(c *gin.Context) {
 		return
 	}
 	httpx.Created(c, "Client berhasil dibuat", client)
+}
+
+func (h Handler) adminClientDetail(c *gin.Context) {
+	client, err := h.store.GetUserByID(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if client.Role != domain.RoleClient {
+		httpx.Fail(c, httpx.NotFound("Client tidak ditemukan"))
+		return
+	}
+
+	projects, err := h.store.ListClientProjects(c.Request.Context(), client.ID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Detail client", gin.H{
+		"client":   client,
+		"projects": projects,
+	})
 }
 
 func (h Handler) sendClientInvitation(c *gin.Context) {

@@ -53,3 +53,8 @@ export type ChangePasswordPayload = {
   oldPassword: string;
   newPassword: string;
 };
+
+export type UpdateProfilePayload = {
+  name: string;
+  email: string;
+};

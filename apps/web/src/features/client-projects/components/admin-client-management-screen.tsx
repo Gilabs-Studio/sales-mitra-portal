@@ -15,7 +15,7 @@ import {
   useSendClientInvitation,
 } from "../hooks/use-client-projects";
 import type { ClientWithStats } from "../types/client-project.types";
-import { Link } from "@/i18n/routing";
+import { Link, useRouter } from "@/i18n/routing";
 
 export function AdminClientManagementScreen() {
   const auth = useAuthGuard("admin");
@@ -59,6 +59,7 @@ export function AdminClientManagementScreen() {
 
 function CreateClientPanel() {
   const createClient = useCreateClient();
+  const router = useRouter();
   const [values, setValues] = React.useState({
     name: "",
     email: "",
@@ -77,7 +78,10 @@ function CreateClientPanel() {
         onSubmit={(event) => {
           event.preventDefault();
           createClient.mutate(values, {
-            onSuccess: () => setValues({ name: "", email: "", password: "", sendInvitation: true }),
+            onSuccess: (client) => {
+              setValues({ name: "", email: "", password: "", sendInvitation: true });
+              router.push(`/admin/clients/${client.id}`);
+            },
           });
         }}
       >
@@ -181,10 +185,10 @@ function ClientRow({ client }: { client: ClientWithStats }) {
             Reset
           </button>
           <Link
-            href={`/admin/client-projects?clientId=${client.id}`}
+            href={`/admin/clients/${client.id}`}
             className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-primary bg-primary px-3 text-xs font-bold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0"
           >
-            Project
+            Detail
             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
           </Link>
         </div>

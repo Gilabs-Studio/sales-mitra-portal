@@ -1,6 +1,7 @@
 import { apiClient, unwrapApiResponse, type ApiEnvelope } from "@/lib/api-client";
 import type {
   ClientDashboard,
+  AdminClientDetail,
   ClientProject,
   ClientProjectDetail,
   CreateClientPayload,
@@ -26,6 +27,11 @@ export async function listAdminClients(params: { page?: number; pageSize?: numbe
 
 export async function createClient(payload: CreateClientPayload) {
   const response = await apiClient.post<ApiEnvelope<User>>("/admin/clients", payload);
+  return unwrapApiResponse(response.data);
+}
+
+export async function getAdminClient(clientId: string) {
+  const response = await apiClient.get<ApiEnvelope<AdminClientDetail>>(`/admin/clients/${clientId}`);
   return unwrapApiResponse(response.data);
 }
 

@@ -34,6 +34,11 @@ export type PaginatedClients = {
   totalPages: number;
 };
 
+export type AdminClientDetail = {
+  client: User;
+  projects: ClientProject[];
+};
+
 export type ClientProject = {
   id: string;
   clientId: string;

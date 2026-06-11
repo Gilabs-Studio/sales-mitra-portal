@@ -6,6 +6,7 @@ import type {
   PasswordResetConfirmPayload,
   PasswordResetRequestPayload,
   RegisterPayload,
+  UpdateProfilePayload,
   User,
 } from "../types/auth.types";
 
@@ -36,6 +37,11 @@ export async function requestCurrentUserPasswordReset() {
 
 export async function changePassword(payload: ChangePasswordPayload) {
   const response = await apiClient.post<ApiEnvelope<Record<string, never>>>("/me/password-change", payload);
+  return unwrapApiResponse(response.data);
+}
+
+export async function updateProfile(payload: UpdateProfilePayload) {
+  const response = await apiClient.patch<ApiEnvelope<User>>("/me/profile", payload);
   return unwrapApiResponse(response.data);
 }
 

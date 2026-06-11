@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale } from "next-intl";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -11,11 +11,13 @@ import {
   passwordResetConfirmSchema,
   passwordResetRequestSchema,
   registerSchema,
+  updateProfileSchema,
   type LoginFormValues,
   type ChangePasswordFormValues,
   type PasswordResetConfirmFormValues,
   type PasswordResetRequestFormValues,
   type RegisterFormValues,
+  type UpdateProfileFormValues,
 } from "../schemas/auth.schema";
 import {
   confirmPasswordReset,
@@ -25,6 +27,7 @@ import {
   registerPartner,
   requestCurrentUserPasswordReset,
   requestPasswordReset,
+  updateProfile,
 } from "../services/auth.service";
 import { isAdminRole, rolePath, type Role } from "../types/auth.types";
 import { clearAccessToken, getAccessToken, setAccessToken } from "../utils/auth-storage";
@@ -168,6 +171,29 @@ export function useChangePasswordForm() {
     form,
     errorMessage: mutation.error instanceof Error ? mutation.error.message : "",
     successMessage: mutation.isSuccess ? "Password akun berhasil diperbarui." : "",
+    isLoading: mutation.isPending,
+    onSubmit: form.handleSubmit((values) => mutation.mutate(values)),
+  };
+}
+
+export function useUpdateProfileForm(initialValues: UpdateProfileFormValues) {
+  const queryClient = useQueryClient();
+  const form = useForm<UpdateProfileFormValues>({
+    resolver: zodResolver(updateProfileSchema),
+    defaultValues: initialValues,
+  });
+
+  const mutation = useMutation({
+    mutationFn: updateProfile,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    },
+  });
+
+  return {
+    form,
+    errorMessage: mutation.error instanceof Error ? mutation.error.message : "",
+    successMessage: mutation.isSuccess ? "Profil berhasil diperbarui." : "",
     isLoading: mutation.isPending,
     onSubmit: form.handleSubmit((values) => mutation.mutate(values)),
   };

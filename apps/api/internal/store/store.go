@@ -624,6 +624,29 @@ func (s *Store) SetRoleByEmail(ctx context.Context, email string, role domain.Ro
 	return err
 }
 
+func (s *Store) UpdateUserProfile(ctx context.Context, userID string, name string, email string) (domain.User, error) {
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE users
+		 SET name = ?, email = ?
+		 WHERE id = ?`,
+		strings.TrimSpace(name),
+		strings.ToLower(strings.TrimSpace(email)),
+		userID,
+	)
+	if err != nil {
+		return domain.User{}, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return domain.User{}, err
+	}
+	if affected == 0 {
+		return domain.User{}, ErrNotFound
+	}
+	return s.GetUserByID(ctx, userID)
+}
+
 func (s *Store) UpdateUserPassword(ctx context.Context, userID string, passwordHash string) error {
 	result, err := s.db.ExecContext(
 		ctx,

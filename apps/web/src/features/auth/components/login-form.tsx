@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Link } from "@/i18n/routing";
 import { useLoginForm } from "../hooks/use-auth";
 
-export function LoginForm() {
+export function LoginForm({ hideRegisterLink = false }: { hideRegisterLink?: boolean }) {
   const { form, isLoading, errorMessage, onSubmit } = useLoginForm();
   const {
     register,
@@ -47,12 +47,14 @@ export function LoginForm() {
           Lupa password?
         </Link>
       </p>
-      <p className="text-center text-sm text-muted-foreground">
-        Belum punya akun?{" "}
-        <Link href="/register" className="font-semibold text-foreground underline underline-offset-4">
-          Daftar sebagai mitra
-        </Link>
-      </p>
+      {!hideRegisterLink ? (
+        <p className="text-center text-sm text-muted-foreground">
+          Belum punya akun?{" "}
+          <Link href="/register" className="font-semibold text-foreground underline underline-offset-4">
+            Daftar sebagai mitra
+          </Link>
+        </p>
+      ) : null}
     </form>
   );
 }

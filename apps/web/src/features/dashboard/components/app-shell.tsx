@@ -31,7 +31,6 @@ const partnerNav: NavItem[] = [
 const adminNav: NavItem[] = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/clients", label: "Client" },
-  { href: "/admin/client-projects", label: "Project" },
   { href: "/admin/leads", label: "Lead" },
   { href: "/admin/chat", label: "Chat" },
   { href: "/admin/services", label: "Layanan" },

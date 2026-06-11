@@ -9,6 +9,7 @@ import {
   createProjectInvoice,
   createProjectProgress,
   getAdminClientProject,
+  getAdminClient,
   getClientDashboard,
   getClientProject,
   listAdminClientProjects,
@@ -52,6 +53,14 @@ export function useSendClientInvitation() {
   });
 }
 
+export function useAdminClient(clientId: string) {
+  return useQuery({
+    queryKey: ["admin", "clients", clientId],
+    queryFn: () => getAdminClient(clientId),
+    enabled: !!clientId,
+  });
+}
+
 export function useAdminClientProjects(clientId?: string) {
   return useQuery({
     queryKey: ["admin", "client-projects", clientId ?? "all"],
@@ -63,9 +72,10 @@ export function useCreateClientProject() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: ProjectPayload) => createClientProject(payload),
-    onSuccess: () => {
+    onSuccess: (_project, payload) => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "client-projects"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "clients"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "clients", payload.clientId] });
     },
   });
 }

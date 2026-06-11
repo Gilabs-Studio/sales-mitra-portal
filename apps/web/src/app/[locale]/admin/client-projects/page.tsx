@@ -1,5 +1,10 @@
-import { AdminClientProjectsScreen } from "@/features/client-projects/components/admin-client-projects-screen";
+import { redirect } from "@/i18n/routing";
 
-export default function AdminClientProjectsPage() {
-  return <AdminClientProjectsScreen />;
+type PageProps = {
+  params: Promise<{ locale: string }>;
+};
+
+export default async function AdminClientProjectsPage({ params }: PageProps) {
+  const { locale } = await params;
+  redirect({ href: "/admin/clients", locale });
 }

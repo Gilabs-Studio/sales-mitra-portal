@@ -32,8 +32,14 @@ export const changePasswordSchema = z.object({
   path: ["confirmPassword"],
 });
 
+export const updateProfileSchema = z.object({
+  name: z.string().min(2, "Nama minimal 2 karakter"),
+  email: z.string().email("Email tidak valid"),
+});
+
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type RegisterFormValues = z.infer<typeof registerSchema>;
 export type PasswordResetRequestFormValues = z.infer<typeof passwordResetRequestSchema>;
 export type PasswordResetConfirmFormValues = z.infer<typeof passwordResetConfirmSchema>;
 export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
+export type UpdateProfileFormValues = z.infer<typeof updateProfileSchema>;

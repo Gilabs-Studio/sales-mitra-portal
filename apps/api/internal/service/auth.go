@@ -64,6 +64,11 @@ type ChangePasswordInput struct {
 	NewPassword string `json:"newPassword"`
 }
 
+type UpdateProfileInput struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
 type SuspensionInput struct {
 	IsSuspended bool   `json:"isSuspended"`
 	Reason      string `json:"reason"`
@@ -325,6 +330,26 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID string, input C
 		return err
 	}
 	return s.store.UpdateUserPassword(ctx, userID, hash)
+}
+
+func (s *AuthService) UpdateProfile(ctx context.Context, userID string, input UpdateProfileInput) (domain.User, error) {
+	input.Name = strings.TrimSpace(input.Name)
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
+	if input.Name == "" || input.Email == "" || !strings.Contains(input.Email, "@") {
+		return domain.User{}, httpx.Validation("Profil belum valid", "Nama dan email valid wajib diisi.")
+	}
+
+	user, err := s.store.UpdateUserProfile(ctx, userID, input.Name, input.Email)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return domain.User{}, httpx.NotFound("Pengguna tidak ditemukan")
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return domain.User{}, httpx.Conflict("Email sudah digunakan akun lain")
+		}
+		return domain.User{}, err
+	}
+	return user, nil
 }
 
 func (s *AuthService) ConfirmPasswordReset(ctx context.Context, input PasswordResetConfirmInput) error {

@@ -1,9 +1,13 @@
 "use client";
 
-import { Bell, FileText, FolderKanban, ReceiptText, Wrench } from "lucide-react";
+import { Bell, FileText, FolderKanban, KeyRound, ReceiptText, Save, UserRound, Wrench } from "lucide-react";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { MetricGrid } from "@/features/dashboard/components/metric-grid";
-import { useAuthGuard } from "@/features/auth/hooks/use-auth";
+import { useAuthGuard, useUpdateProfileForm } from "@/features/auth/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Link } from "@/i18n/routing";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useClientDashboard } from "../hooks/use-client-projects";
 import { ProjectTable } from "./project-table";
@@ -68,6 +72,8 @@ export function ClientDashboardScreen() {
         </section>
 
         <div className="grid gap-4 lg:grid-cols-2">
+          <AccountSettingsPanel user={auth.user} />
+
           <section className="rounded-lg border border-border bg-card p-5">
             <div className="flex items-center gap-2 text-sm font-extrabold text-foreground">
               <Wrench className="h-4 w-4 text-primary" aria-hidden="true" />
@@ -132,6 +138,50 @@ export function ClientDashboardScreen() {
         </section>
       </div>
     </AppShell>
+  );
+}
+
+function AccountSettingsPanel({ user }: { user: { name: string; email: string } }) {
+  const profile = useUpdateProfileForm({ name: user.name, email: user.email });
+  const {
+    register,
+    formState: { errors },
+  } = profile.form;
+
+  return (
+    <section className="rounded-lg border border-border bg-card p-5">
+      <div className="flex items-center gap-2 text-sm font-extrabold text-foreground">
+        <UserRound className="h-4 w-4 text-primary" aria-hidden="true" />
+        Akun client
+      </div>
+      <form className="mt-4 space-y-3" onSubmit={profile.onSubmit}>
+        <Field>
+          <FieldLabel>Nama</FieldLabel>
+          <Input {...register("name")} />
+          {errors.name ? <FieldError>{errors.name.message}</FieldError> : null}
+        </Field>
+        <Field>
+          <FieldLabel>Email</FieldLabel>
+          <Input type="email" {...register("email")} />
+          {errors.email ? <FieldError>{errors.email.message}</FieldError> : null}
+        </Field>
+        {profile.errorMessage ? <FieldError>{profile.errorMessage}</FieldError> : null}
+        {profile.successMessage ? <p className="text-xs font-semibold text-success">{profile.successMessage}</p> : null}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Button type="submit" isLoading={profile.isLoading}>
+            <Save className="h-4 w-4" aria-hidden="true" />
+            Simpan profil
+          </Button>
+          <Link
+            href="/change-password"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2 text-sm font-semibold text-foreground transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#e8e6dc] active:translate-y-0"
+          >
+            <KeyRound className="h-4 w-4" aria-hidden="true" />
+            Ganti password
+          </Link>
+        </div>
+      </form>
+    </section>
   );
 }
 
