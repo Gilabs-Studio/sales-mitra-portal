@@ -43,6 +43,13 @@ type CreateAdminInput struct {
 	Password string `json:"password"`
 }
 
+type CreateClientInput struct {
+	Name           string `json:"name"`
+	Email          string `json:"email"`
+	Password       string `json:"password"`
+	SendInvitation bool   `json:"sendInvitation"`
+}
+
 type PasswordResetRequestInput struct {
 	Email string `json:"email"`
 }
@@ -148,6 +155,60 @@ func (s *AuthService) CreateAdmin(ctx context.Context, input CreateAdminInput) (
 			return domain.User{}, httpx.Conflict("Email atau username admin sudah terdaftar")
 		}
 		return domain.User{}, err
+	}
+
+	return user, nil
+}
+
+func (s *AuthService) CreateClient(ctx context.Context, input CreateClientInput) (domain.User, error) {
+	input.Name = strings.TrimSpace(input.Name)
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
+	input.Password = strings.TrimSpace(input.Password)
+
+	if input.Name == "" || input.Email == "" {
+		return domain.User{}, httpx.Validation("Data client belum valid", "Nama dan email client wajib diisi.")
+	}
+	if input.SendInvitation && (s.notifier == nil || !s.notifier.Enabled()) {
+		return domain.User{}, httpx.Validation("Invitation email belum aktif", "Konfigurasikan RESEND_API_KEY dan RESEND_FROM_EMAIL terlebih dahulu.")
+	}
+	if input.Password == "" {
+		if !input.SendInvitation {
+			return domain.User{}, httpx.Validation("Password awal wajib diisi", "Atau aktifkan invitation email agar client membuat password sendiri.")
+		}
+		generated, err := randomToken(16)
+		if err != nil {
+			return domain.User{}, err
+		}
+		input.Password = generated
+	}
+	if len(input.Password) < 8 {
+		return domain.User{}, httpx.Validation("Password awal terlalu pendek", "Password minimal 8 karakter.")
+	}
+
+	hash, err := hashPassword(input.Password)
+	if err != nil {
+		return domain.User{}, err
+	}
+
+	user := domain.User{
+		ID:        uuid.NewString(),
+		Name:      input.Name,
+		Email:     input.Email,
+		Role:      domain.RoleClient,
+		CreatedAt: time.Now().UTC(),
+	}
+
+	if err := s.store.CreateUser(ctx, user, hash); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return domain.User{}, httpx.Conflict("Email client sudah terdaftar")
+		}
+		return domain.User{}, err
+	}
+
+	if input.SendInvitation {
+		if err := s.RequestPasswordResetForUser(ctx, user.ID); err != nil {
+			return domain.User{}, err
+		}
 	}
 
 	return user, nil

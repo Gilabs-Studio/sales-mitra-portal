@@ -6,7 +6,7 @@ import { Download, KeyRound, LogOut, Smartphone } from "lucide-react";
 import { Link, usePathname } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 import { useLogout } from "@/features/auth/hooks/use-auth";
-import { isAdminRole, rolePath, type User } from "@/features/auth/types/auth.types";
+import { isAdminRole, type User } from "@/features/auth/types/auth.types";
 import { useUnreadCount } from "@/features/leads/hooks/use-leads";
 
 type NavItem = {
@@ -30,11 +30,18 @@ const partnerNav: NavItem[] = [
 
 const adminNav: NavItem[] = [
   { href: "/admin", label: "Dashboard" },
+  { href: "/admin/clients", label: "Client" },
+  { href: "/admin/client-projects", label: "Project" },
   { href: "/admin/leads", label: "Lead" },
   { href: "/admin/chat", label: "Chat" },
   { href: "/admin/services", label: "Layanan" },
   { href: "/admin/partners", label: "Mitra" },
   { href: "/admin/admins", label: "Admin", superAdminOnly: true },
+];
+
+const clientNav: NavItem[] = [
+  { href: "/client", label: "Dashboard" },
+  { href: "/client/projects", label: "Project" },
 ];
 
 export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>) {
@@ -43,8 +50,10 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
   const adminScope = isAdminRole(user.role);
   const items = adminScope
     ? adminNav.filter((item) => !item.superAdminOnly || user.role === "super_admin")
-    : partnerNav;
-  const unreadQuery = useUnreadCount(rolePath(user.role));
+    : user.role === "client"
+      ? clientNav
+      : partnerNav;
+  const unreadQuery = useUnreadCount(user.role === "client" ? undefined : adminScope ? "admin" : "partner");
   const mobileDownloadUrl = process.env.NEXT_PUBLIC_MOBILE_APP_DOWNLOAD_URL;
 
   const [profileOpen, setProfileOpen] = React.useState(false);
@@ -135,7 +144,7 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
                 <div className="hidden md:flex flex-col text-left">
                   <span className="text-xs font-bold text-foreground leading-none">{user.name}</span>
                   <span className="text-[10px] text-muted-foreground mt-1">
-                    {adminScope ? (user.role === "super_admin" ? "Super Admin" : "Admin") : user.partnerCode}
+                    {adminScope ? (user.role === "super_admin" ? "Super Admin" : "Admin") : user.role === "client" ? "Client" : user.partnerCode}
                   </span>
                 </div>
               </button>
@@ -147,7 +156,11 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
                     <div className="text-xs font-bold text-foreground leading-none">{user.name}</div>
                     <div className="text-[10px] text-muted-foreground mt-1 truncate">{user.email}</div>
                     <div className="mt-1.5 text-[9px] font-semibold text-primary uppercase tracking-wider">
-                      {adminScope ? (user.role === "super_admin" ? "Console Super Admin" : "Console Admin") : `Mitra Code: ${user.partnerCode}`}
+                      {adminScope
+                        ? (user.role === "super_admin" ? "Console Super Admin" : "Console Admin")
+                        : user.role === "client"
+                          ? "Client Portal"
+                          : `Mitra Code: ${user.partnerCode}`}
                     </div>
                   </div>
                   <div className="my-1 border-t border-border/60" />

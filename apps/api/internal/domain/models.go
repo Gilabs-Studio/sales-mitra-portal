@@ -8,6 +8,7 @@ const (
 	RoleSuperAdmin Role = "super_admin"
 	RoleAdmin      Role = "admin"
 	RolePartner    Role = "partner"
+	RoleClient     Role = "client"
 )
 
 func (r Role) IsAdminScope() bool {
@@ -15,7 +16,7 @@ func (r Role) IsAdminScope() bool {
 }
 
 func (r Role) IsValid() bool {
-	return r == RoleSuperAdmin || r == RoleAdmin || r == RolePartner
+	return r == RoleSuperAdmin || r == RoleAdmin || r == RolePartner || r == RoleClient
 }
 
 func (r Role) OperationalRole() Role {
@@ -24,6 +25,61 @@ func (r Role) OperationalRole() Role {
 	}
 	return r
 }
+
+func (r Role) IsClientScope() bool {
+	return r == RoleClient
+}
+
+type ProjectStatus string
+
+const (
+	ProjectStatusDiscovery   ProjectStatus = "discovery"
+	ProjectStatusPlanning    ProjectStatus = "planning"
+	ProjectStatusDevelopment ProjectStatus = "development"
+	ProjectStatusTesting     ProjectStatus = "testing"
+	ProjectStatusDeployment  ProjectStatus = "deployment"
+	ProjectStatusCompleted   ProjectStatus = "completed"
+	ProjectStatusMaintenance ProjectStatus = "maintenance"
+)
+
+type ProgressStatus string
+
+const (
+	ProgressStatusTodo       ProgressStatus = "todo"
+	ProgressStatusInProgress ProgressStatus = "in_progress"
+	ProgressStatusBlocked    ProgressStatus = "blocked"
+	ProgressStatusDone       ProgressStatus = "done"
+)
+
+type MaintenanceStatus string
+
+const (
+	MaintenanceStatusOpen       MaintenanceStatus = "open"
+	MaintenanceStatusInProgress MaintenanceStatus = "in_progress"
+	MaintenanceStatusResolved   MaintenanceStatus = "resolved"
+	MaintenanceStatusRejected   MaintenanceStatus = "rejected"
+)
+
+type InvoiceStatus string
+
+const (
+	InvoiceStatusDraft          InvoiceStatus = "draft"
+	InvoiceStatusSent           InvoiceStatus = "sent"
+	InvoiceStatusWaitingPayment InvoiceStatus = "waiting_payment"
+	InvoiceStatusPaid           InvoiceStatus = "paid"
+	InvoiceStatusOverdue        InvoiceStatus = "overdue"
+)
+
+type DocumentCategory string
+
+const (
+	DocumentCategoryDeliverable DocumentCategory = "deliverable"
+	DocumentCategoryProgress    DocumentCategory = "progress"
+	DocumentCategoryMaintenance DocumentCategory = "maintenance"
+	DocumentCategoryInvoice     DocumentCategory = "invoice"
+	DocumentCategoryReport      DocumentCategory = "report"
+	DocumentCategoryOther       DocumentCategory = "other"
+)
 
 type ServiceType string
 
@@ -57,6 +113,133 @@ type User struct {
 	SuspendedReason string    `json:"suspendedReason"`
 	SuspendedAt     time.Time `json:"suspendedAt,omitempty"`
 	CreatedAt       time.Time `json:"createdAt"`
+}
+
+type ClientProject struct {
+	ID                 string        `json:"id"`
+	ClientID           string        `json:"clientId"`
+	ClientName         string        `json:"clientName,omitempty"`
+	ClientEmail        string        `json:"clientEmail,omitempty"`
+	Name               string        `json:"name"`
+	Description        string        `json:"description"`
+	PICName            string        `json:"picName"`
+	PICEmail           string        `json:"picEmail"`
+	StartDate          time.Time     `json:"startDate"`
+	TargetEndDate      time.Time     `json:"targetEndDate"`
+	Status             ProjectStatus `json:"status"`
+	ProgressPercent    int           `json:"progressPercent"`
+	WebsiteURL         string        `json:"websiteUrl"`
+	StagingURL         string        `json:"stagingUrl"`
+	CredentialNote     string        `json:"credentialNote"`
+	DocumentationURL   string        `json:"documentationUrl"`
+	MaintenanceActive  bool          `json:"maintenanceActive"`
+	UnpaidInvoiceCount int64         `json:"unpaidInvoiceCount"`
+	LatestProgressNote string        `json:"latestProgressNote"`
+	LatestProgressAt   time.Time     `json:"latestProgressAt"`
+	CreatedAt          time.Time     `json:"createdAt"`
+	UpdatedAt          time.Time     `json:"updatedAt"`
+}
+
+type ProjectProgress struct {
+	ID          string         `json:"id"`
+	ProjectID   string         `json:"projectId"`
+	Title       string         `json:"title"`
+	Status      ProgressStatus `json:"status"`
+	Percentage  int            `json:"percentage"`
+	Note        string         `json:"note"`
+	DocumentURL string         `json:"documentUrl"`
+	UpdatedByID string         `json:"updatedById"`
+	UpdatedBy   string         `json:"updatedBy"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+}
+
+type ProjectDocument struct {
+	ID          string           `json:"id"`
+	ProjectID   string           `json:"projectId"`
+	Title       string           `json:"title"`
+	Category    DocumentCategory `json:"category"`
+	URL         string           `json:"url"`
+	Description string           `json:"description"`
+	UploadedBy  string           `json:"uploadedBy"`
+	CreatedAt   time.Time        `json:"createdAt"`
+}
+
+type MaintenancePlan struct {
+	ID             string    `json:"id"`
+	ProjectID      string    `json:"projectId"`
+	Type           string    `json:"type"`
+	PeriodStart    time.Time `json:"periodStart"`
+	PeriodEnd      time.Time `json:"periodEnd"`
+	QuotaTotal     int       `json:"quotaTotal"`
+	QuotaUsed      int       `json:"quotaUsed"`
+	QuotaRemaining int       `json:"quotaRemaining"`
+	IsActive       bool      `json:"isActive"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
+}
+
+type MaintenanceLog struct {
+	ID          string            `json:"id"`
+	ProjectID   string            `json:"projectId"`
+	RequestDate time.Time         `json:"requestDate"`
+	Description string            `json:"description"`
+	Status      MaintenanceStatus `json:"status"`
+	PICName     string            `json:"picName"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
+}
+
+type ProjectInvoice struct {
+	ID          string        `json:"id"`
+	ProjectID   string        `json:"projectId"`
+	Number      string        `json:"number"`
+	Amount      int64         `json:"amount"`
+	Status      InvoiceStatus `json:"status"`
+	IssuedAt    time.Time     `json:"issuedAt"`
+	DueAt       time.Time     `json:"dueAt"`
+	PaidAt      time.Time     `json:"paidAt"`
+	DocumentURL string        `json:"documentUrl"`
+	PaymentNote string        `json:"paymentNote"`
+	CreatedAt   time.Time     `json:"createdAt"`
+	UpdatedAt   time.Time     `json:"updatedAt"`
+}
+
+type ProjectActivity struct {
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"projectId"`
+	ActorID     string    `json:"actorId"`
+	ActorName   string    `json:"actorName"`
+	Action      string    `json:"action"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+type ClientDashboard struct {
+	Summary        []MetricCard      `json:"summary"`
+	Projects       []ClientProject   `json:"projects"`
+	Maintenance    []MaintenancePlan `json:"maintenance"`
+	UnpaidInvoices []ProjectInvoice  `json:"unpaidInvoices"`
+	Notifications  []ProjectActivity `json:"notifications"`
+}
+
+type ClientProjectDetail struct {
+	Project         ClientProject     `json:"project"`
+	Progress        []ProjectProgress `json:"progress"`
+	Documents       []ProjectDocument `json:"documents"`
+	Maintenance     *MaintenancePlan  `json:"maintenance,omitempty"`
+	MaintenanceLogs []MaintenanceLog  `json:"maintenanceLogs"`
+	Invoices        []ProjectInvoice  `json:"invoices"`
+	Activities      []ProjectActivity `json:"activities"`
+	Reports         []ProjectDocument `json:"reports"`
+}
+
+type ClientWithStats struct {
+	User
+	TotalProjects       int64 `json:"totalProjects"`
+	ActiveProjects      int64 `json:"activeProjects"`
+	MaintenanceProjects int64 `json:"maintenanceProjects"`
+	UnpaidInvoices      int64 `json:"unpaidInvoices"`
 }
 
 type UserAuth struct {

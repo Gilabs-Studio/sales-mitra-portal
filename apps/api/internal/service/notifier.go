@@ -119,6 +119,29 @@ func (s *NotificationService) NotifyChatMessage(ctx context.Context, recipients 
 	s.sendAsync(ctx, recipients, email)
 }
 
+func (s *NotificationService) NotifyClientProjectEvent(ctx context.Context, recipient string, projectName string, eventTitle string, summary string, detailURL string) {
+	text := strings.TrimSpace(fmt.Sprintf(
+		"%s\n\nProject: %s\n%s\n\nBuka portal client: %s",
+		eventTitle,
+		projectName,
+		summary,
+		detailURL,
+	))
+	htmlBody := fmt.Sprintf(
+		"<p><strong>%s</strong></p><p><strong>Project:</strong> %s</p><p>%s</p><p><a href=\"%s\">Buka portal client</a></p>",
+		html.EscapeString(eventTitle),
+		html.EscapeString(projectName),
+		html.EscapeString(summary),
+		html.EscapeString(detailURL),
+	)
+
+	s.sendAsync(ctx, []string{recipient}, notificationEmail{
+		Subject: fmt.Sprintf("%s: %s", eventTitle, projectName),
+		Text:    text,
+		HTML:    htmlBody,
+	})
+}
+
 func (s *NotificationService) AdminLeadURL(leadID string) string {
 	return joinURL(s.appBaseURL, "/admin/leads/"+leadID)
 }
@@ -133,6 +156,10 @@ func (s *NotificationService) PartnerChatURL(leadID string) string {
 
 func (s *NotificationService) AdminChatURL(leadID string) string {
 	return joinURL(s.appBaseURL, "/admin/chat?id="+leadID)
+}
+
+func (s *NotificationService) ClientProjectURL(projectID string) string {
+	return joinURL(s.appBaseURL, "/client/projects/"+projectID)
 }
 
 func (s *NotificationService) PasswordResetURL(token string) string {

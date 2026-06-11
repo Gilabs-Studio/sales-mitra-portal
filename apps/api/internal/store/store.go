@@ -92,7 +92,7 @@ func (s *Store) Migrate() error {
 			username TEXT NOT NULL DEFAULT '',
 			email TEXT NOT NULL UNIQUE,
 			password_hash TEXT NOT NULL,
-			role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'partner')),
+			role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'partner', 'client')),
 			partner_code TEXT NOT NULL DEFAULT '',
 			is_suspended INTEGER NOT NULL DEFAULT 0,
 			suspended_reason TEXT NOT NULL DEFAULT '',
@@ -175,6 +175,89 @@ func (s *Store) Migrate() error {
 			evidence_url TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS client_projects (
+			id TEXT PRIMARY KEY,
+			client_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			pic_name TEXT NOT NULL DEFAULT '',
+			pic_email TEXT NOT NULL DEFAULT '',
+			start_date TEXT NOT NULL DEFAULT '',
+			target_end_date TEXT NOT NULL DEFAULT '',
+			status TEXT NOT NULL,
+			progress_percent INTEGER NOT NULL DEFAULT 0,
+			website_url TEXT NOT NULL DEFAULT '',
+			staging_url TEXT NOT NULL DEFAULT '',
+			credential_note TEXT NOT NULL DEFAULT '',
+			documentation_url TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS project_progress (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES client_projects(id) ON DELETE CASCADE,
+			title TEXT NOT NULL,
+			status TEXT NOT NULL,
+			percentage INTEGER NOT NULL DEFAULT 0,
+			note TEXT NOT NULL DEFAULT '',
+			document_url TEXT NOT NULL DEFAULT '',
+			updated_by_id TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS project_documents (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES client_projects(id) ON DELETE CASCADE,
+			title TEXT NOT NULL,
+			category TEXT NOT NULL DEFAULT 'other',
+			url TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			uploaded_by_id TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS maintenance_plans (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL UNIQUE REFERENCES client_projects(id) ON DELETE CASCADE,
+			type TEXT NOT NULL,
+			period_start TEXT NOT NULL DEFAULT '',
+			period_end TEXT NOT NULL DEFAULT '',
+			quota_total INTEGER NOT NULL DEFAULT 0,
+			is_active INTEGER NOT NULL DEFAULT 1,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS maintenance_logs (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES client_projects(id) ON DELETE CASCADE,
+			request_date TEXT NOT NULL,
+			description TEXT NOT NULL,
+			status TEXT NOT NULL,
+			pic_name TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS project_invoices (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES client_projects(id) ON DELETE CASCADE,
+			number TEXT NOT NULL,
+			amount INTEGER NOT NULL DEFAULT 0,
+			status TEXT NOT NULL,
+			issued_at TEXT NOT NULL DEFAULT '',
+			due_at TEXT NOT NULL DEFAULT '',
+			paid_at TEXT NOT NULL DEFAULT '',
+			document_url TEXT NOT NULL DEFAULT '',
+			payment_note TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS project_activities (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES client_projects(id) ON DELETE CASCADE,
+			actor_id TEXT NOT NULL DEFAULT '',
+			action TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL
+		)`,
 	}
 
 	indexes := []string{
@@ -188,6 +271,12 @@ func (s *Store) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_referrals_partner ON referrals(partner_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_lead_payouts_lead ON lead_payouts(lead_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user ON password_reset_tokens(user_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_client_projects_client_status ON client_projects(client_id, status, updated_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_project_progress_project_updated ON project_progress(project_id, updated_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_project_documents_project_category ON project_documents(project_id, category, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_maintenance_logs_project_date ON maintenance_logs(project_id, request_date DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_project_invoices_project_status ON project_invoices(project_id, status, due_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_project_activities_project_created ON project_activities(project_id, created_at DESC)`,
 	}
 
 	tx, err := s.db.Begin()
@@ -245,16 +334,13 @@ func updateUsersRoleConstraint(tx *sql.Tx) error {
 		return err
 	}
 
-	if strings.Contains(schemaSQL, "'super_admin'") {
+	if strings.Contains(schemaSQL, "'super_admin'") && strings.Contains(schemaSQL, "'client'") {
 		return nil
 	}
 
-	updatedSchema := strings.Replace(
-		schemaSQL,
-		"CHECK (role IN ('admin', 'partner'))",
-		"CHECK (role IN ('super_admin', 'admin', 'partner'))",
-		1,
-	)
+	updatedSchema := schemaSQL
+	updatedSchema = strings.Replace(updatedSchema, "CHECK (role IN ('admin', 'partner'))", "CHECK (role IN ('super_admin', 'admin', 'partner', 'client'))", 1)
+	updatedSchema = strings.Replace(updatedSchema, "CHECK (role IN ('super_admin', 'admin', 'partner'))", "CHECK (role IN ('super_admin', 'admin', 'partner', 'client'))", 1)
 	if updatedSchema == schemaSQL {
 		return fmt.Errorf("gagal memperbarui constraint role users")
 	}
@@ -1697,7 +1783,24 @@ func formatOptionalTime(value time.Time) string {
 }
 
 func (s *Store) Cleanup(ctx context.Context) error {
-	tables := []string{"lead_payouts", "lead_messages", "lead_events", "password_reset_tokens", "leads", "referrals", "users", "service_catalog", "knowledge_articles"}
+	tables := []string{
+		"project_activities",
+		"project_invoices",
+		"maintenance_logs",
+		"maintenance_plans",
+		"project_documents",
+		"project_progress",
+		"client_projects",
+		"lead_payouts",
+		"lead_messages",
+		"lead_events",
+		"password_reset_tokens",
+		"leads",
+		"referrals",
+		"users",
+		"service_catalog",
+		"knowledge_articles",
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

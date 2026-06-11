@@ -24,6 +24,7 @@ type Handler struct {
 	leadService      *service.LeadService
 	knowledgeService *service.KnowledgeService
 	catalogService   *service.ServiceCatalogService
+	clientService    *service.ClientPortalService
 	uploadService    *service.UploadService
 }
 
@@ -34,6 +35,7 @@ func NewRouter(
 	leadService *service.LeadService,
 	knowledgeService *service.KnowledgeService,
 	catalogService *service.ServiceCatalogService,
+	clientService *service.ClientPortalService,
 ) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
@@ -62,6 +64,7 @@ func NewRouter(
 		leadService:      leadService,
 		knowledgeService: knowledgeService,
 		catalogService:   catalogService,
+		clientService:    clientService,
 		uploadService:    service.NewUploadService(cfg),
 	}
 
@@ -115,6 +118,25 @@ func NewRouter(
 	admin.PATCH("/users/:id/suspension", handler.updateUserSuspension)
 	admin.GET("/admins", requireRole(domain.RoleSuperAdmin), handler.listAdmins)
 	admin.POST("/admins", requireRole(domain.RoleSuperAdmin), handler.createAdmin)
+	admin.GET("/clients", handler.adminClients)
+	admin.POST("/clients", handler.createClient)
+	admin.POST("/clients/:id/invitation", handler.sendClientInvitation)
+	admin.GET("/client-projects", handler.adminClientProjects)
+	admin.POST("/client-projects", handler.createClientProject)
+	admin.GET("/client-projects/:id", handler.adminClientProjectDetail)
+	admin.PATCH("/client-projects/:id", handler.updateClientProject)
+	admin.POST("/client-projects/:id/progress", handler.createProjectProgress)
+	admin.POST("/client-projects/:id/documents", handler.createProjectDocument)
+	admin.POST("/client-projects/:id/maintenance", handler.upsertMaintenancePlan)
+	admin.POST("/client-projects/:id/maintenance/logs", handler.createMaintenanceLog)
+	admin.POST("/client-projects/:id/invoices", handler.createProjectInvoice)
+	admin.PATCH("/client-invoices/:id", handler.updateProjectInvoice)
+
+	client := protected.Group("/client")
+	client.Use(requireRole(domain.RoleClient))
+	client.GET("/dashboard", handler.clientDashboard)
+	client.GET("/projects", handler.clientProjects)
+	client.GET("/projects/:id", handler.clientProjectDetail)
 
 	router.Static("/uploads", "./data/uploads")
 
