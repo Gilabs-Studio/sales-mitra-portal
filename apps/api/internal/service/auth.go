@@ -99,6 +99,7 @@ func (s *AuthService) RegisterPartner(ctx context.Context, input RegisterInput) 
 		Email:       input.Email,
 		Role:        domain.RolePartner,
 		PartnerCode: uniquePartnerCode(input.Name, s.cfg.ReferralCodeSeed),
+		LeadEmailNotificationsEnabled: true,
 		CreatedAt:   time.Now().UTC(),
 	}
 
@@ -141,6 +142,7 @@ func (s *AuthService) CreateAdmin(ctx context.Context, input CreateAdminInput) (
 		Username:  input.Username,
 		Email:     input.Email,
 		Role:      domain.RoleAdmin,
+		LeadEmailNotificationsEnabled: true,
 		CreatedAt: time.Now().UTC(),
 	}
 
@@ -172,6 +174,7 @@ func (s *AuthService) CreateClient(ctx context.Context, name string, email strin
 		Name:      name,
 		Email:     email,
 		Role:      domain.RoleClient,
+		LeadEmailNotificationsEnabled: true,
 		CreatedAt: time.Now().UTC(),
 	}
 
@@ -307,6 +310,27 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID string, input C
 	return s.store.UpdateUserPassword(ctx, userID, hash)
 }
 
+func (s *AuthService) UpdateLeadEmailNotificationsEnabled(ctx context.Context, userID string, enabled bool) (domain.User, error) {
+	user, err := s.store.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return domain.User{}, httpx.NotFound("Pengguna tidak ditemukan")
+		}
+		return domain.User{}, err
+	}
+	if user.IsSuspended {
+		return domain.User{}, httpx.Forbidden("Akun sedang disuspend dan tidak bisa diakses")
+	}
+	if err := s.store.UpdateLeadEmailNotificationsEnabled(ctx, userID, enabled); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return domain.User{}, httpx.NotFound("Pengguna tidak ditemukan")
+		}
+		return domain.User{}, err
+	}
+	user.LeadEmailNotificationsEnabled = enabled
+	return user, nil
+}
+
 func (s *AuthService) ConfirmPasswordReset(ctx context.Context, input PasswordResetConfirmInput) error {
 	token := strings.TrimSpace(input.Token)
 	if token == "" || len(input.Password) < 8 {
@@ -419,6 +443,7 @@ func (s *AuthService) ensureUser(ctx context.Context, name string, username stri
 		Email:       strings.ToLower(email),
 		Role:        role,
 		PartnerCode: partnerCode,
+		LeadEmailNotificationsEnabled: true,
 		CreatedAt:   time.Now().UTC(),
 	}
 

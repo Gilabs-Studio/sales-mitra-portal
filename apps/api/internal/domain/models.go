@@ -53,11 +53,12 @@ type User struct {
 	Username        string    `json:"username"`
 	Email           string    `json:"email"`
 	Role            Role      `json:"role"`
-	PartnerCode     string    `json:"partnerCode"`
-	IsSuspended     bool      `json:"isSuspended"`
-	SuspendedReason string    `json:"suspendedReason"`
-	SuspendedAt     time.Time `json:"suspendedAt,omitempty"`
-	CreatedAt       time.Time `json:"createdAt"`
+	PartnerCode                   string    `json:"partnerCode"`
+	LeadEmailNotificationsEnabled bool      `json:"leadEmailNotificationsEnabled"`
+	IsSuspended                   bool      `json:"isSuspended"`
+	SuspendedReason               string    `json:"suspendedReason"`
+	SuspendedAt                   time.Time `json:"suspendedAt,omitempty"`
+	CreatedAt                     time.Time `json:"createdAt"`
 }
 
 type UserAuth struct {

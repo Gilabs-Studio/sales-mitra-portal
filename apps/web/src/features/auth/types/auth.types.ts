@@ -18,6 +18,7 @@ export type User = {
   email: string;
   role: Role;
   partnerCode: string;
+  leadEmailNotificationsEnabled: boolean;
   isSuspended: boolean;
   suspendedReason: string;
   createdAt: string;

@@ -126,6 +126,7 @@ func NewRouter(
 	protected.GET("/me", handler.me)
 	protected.POST("/me/password-change", handler.changePassword)
 	protected.POST("/me/password-reset", handler.requestCurrentUserPasswordReset)
+	protected.PATCH("/me/lead-email-notifications", handler.updateLeadEmailNotifications)
 	protected.GET("/knowledge", handler.knowledge)
 	protected.POST("/chatbot/ask", handler.askChatbot)
 
@@ -350,6 +351,25 @@ func (h Handler) changePassword(c *gin.Context) {
 	}
 
 	httpx.OK(c, "Password berhasil diperbarui", gin.H{})
+}
+
+func (h Handler) updateLeadEmailNotifications(c *gin.Context) {
+	var input struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload pengaturan notifikasi tidak valid", err.Error()))
+		return
+	}
+
+	user, err := h.authService.UpdateLeadEmailNotificationsEnabled(c.Request.Context(), currentUser(c).ID, input.Enabled)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	c.Set(currentUserKey, user)
+	httpx.OK(c, "Pengaturan notifikasi lead berhasil diperbarui", user)
 }
 
 func (h Handler) serviceCatalog(c *gin.Context) {

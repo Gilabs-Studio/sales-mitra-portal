@@ -123,6 +123,7 @@ func (s *Store) Migrate() error {
 			password_hash TEXT NOT NULL,
 			role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'partner', 'client')),
 			partner_code TEXT NOT NULL DEFAULT '',
+			lead_email_notifications_enabled INTEGER NOT NULL DEFAULT 1,
 			is_suspended INTEGER NOT NULL DEFAULT 0,
 			suspended_reason TEXT NOT NULL DEFAULT '',
 			suspended_at TEXT NOT NULL DEFAULT '',
@@ -324,6 +325,9 @@ func (s *Store) Migrate() error {
 	if err := addColumnIfMissing(tx, "users", "suspended_at", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
 	}
+	if err := addColumnIfMissing(tx, "users", "lead_email_notifications_enabled", "INTEGER NOT NULL DEFAULT 1"); err != nil {
+		return err
+	}
 
 	if err := updateUsersRoleConstraint(tx); err != nil {
 		return err
@@ -508,8 +512,8 @@ func (s *Store) SeedKnowledge(ctx context.Context) error {
 func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash string) error {
 	_, err := s.db.ExecContext(
 		ctx,
-		`INSERT INTO users (id, name, username, email, password_hash, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO users (id, name, username, email, password_hash, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		user.ID,
 		user.Name,
 		strings.ToLower(user.Username),
@@ -517,6 +521,7 @@ func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash s
 		passwordHash,
 		user.Role,
 		user.PartnerCode,
+		boolToInt(user.LeadEmailNotificationsEnabled),
 		boolToInt(user.IsSuspended),
 		user.SuspendedReason,
 		formatOptionalTime(user.SuspendedAt),
@@ -528,7 +533,7 @@ func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash s
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (domain.UserAuth, error) {
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, name, username, email, password_hash, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
+		`SELECT id, name, username, email, password_hash, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at
 		 FROM users
 		 WHERE email = ?`,
 		strings.ToLower(email),
@@ -540,7 +545,7 @@ func (s *Store) GetUserByLogin(ctx context.Context, login string) (domain.UserAu
 	login = strings.ToLower(strings.TrimSpace(login))
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, name, username, email, password_hash, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
+		`SELECT id, name, username, email, password_hash, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at
 		 FROM users
 		 WHERE email = ? OR username = ?`,
 		login,
@@ -552,7 +557,7 @@ func (s *Store) GetUserByLogin(ctx context.Context, login string) (domain.UserAu
 func (s *Store) GetUserAuthByID(ctx context.Context, id string) (domain.UserAuth, error) {
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, name, username, email, password_hash, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
+		`SELECT id, name, username, email, password_hash, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at
 		 FROM users
 		 WHERE id = ?`,
 		id,
@@ -563,22 +568,24 @@ func (s *Store) GetUserAuthByID(ctx context.Context, id string) (domain.UserAuth
 func (s *Store) GetUserByID(ctx context.Context, id string) (domain.User, error) {
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, name, username, email, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
+		`SELECT id, name, username, email, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at
 		 FROM users
 		 WHERE id = ?`,
 		id,
 	)
 
 	var user domain.User
+	var leadEmailNotificationsEnabled int
 	var isSuspended int
 	var suspendedAt string
 	var createdAt string
-	if err := row.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt); err != nil {
+	if err := row.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &leadEmailNotificationsEnabled, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.User{}, ErrNotFound
 		}
 		return domain.User{}, err
 	}
+	user.LeadEmailNotificationsEnabled = intToBool(leadEmailNotificationsEnabled)
 	user.IsSuspended = intToBool(isSuspended)
 	user.SuspendedAt = parseOptionalTime(suspendedAt)
 	user.CreatedAt = parseTime(createdAt)
@@ -604,7 +611,7 @@ func (s *Store) ListUsersByRoles(ctx context.Context, roles ...domain.Role) ([]d
 	rows, err := s.db.QueryContext(
 		ctx,
 		fmt.Sprintf(
-			`SELECT id, name, username, email, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
+			`SELECT id, name, username, email, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at
 			 FROM users
 			 WHERE role IN (%s)
 			 ORDER BY created_at ASC`,
@@ -620,12 +627,14 @@ func (s *Store) ListUsersByRoles(ctx context.Context, roles ...domain.Role) ([]d
 	users := []domain.User{}
 	for rows.Next() {
 		var user domain.User
+		var leadEmailNotificationsEnabled int
 		var isSuspended int
 		var suspendedAt string
 		var createdAt string
-		if err := rows.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &leadEmailNotificationsEnabled, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt); err != nil {
 			return nil, err
 		}
+		user.LeadEmailNotificationsEnabled = intToBool(leadEmailNotificationsEnabled)
 		user.IsSuspended = intToBool(isSuspended)
 		user.SuspendedAt = parseOptionalTime(suspendedAt)
 		user.CreatedAt = parseTime(createdAt)
@@ -740,7 +749,7 @@ func (s *Store) MarkPasswordResetTokensUsedByUser(ctx context.Context, userID st
 func (s *Store) GetPasswordResetToken(ctx context.Context, tokenHash string) (domain.User, string, error) {
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT u.id, u.name, u.username, u.email, u.role, u.partner_code, u.is_suspended, u.suspended_reason, u.suspended_at, u.created_at,
+		`SELECT u.id, u.name, u.username, u.email, u.role, u.partner_code, u.lead_email_notifications_enabled, u.is_suspended, u.suspended_reason, u.suspended_at, u.created_at,
 			t.id, t.expires_at, t.used_at
 		FROM password_reset_tokens t
 		INNER JOIN users u ON u.id = t.user_id
@@ -750,18 +759,20 @@ func (s *Store) GetPasswordResetToken(ctx context.Context, tokenHash string) (do
 
 	var user domain.User
 	var tokenID string
+	var leadEmailNotificationsEnabled int
 	var isSuspended int
 	var suspendedAt string
 	var createdAt string
 	var expiresAt string
 	var usedAt string
-	if err := row.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt, &tokenID, &expiresAt, &usedAt); err != nil {
+	if err := row.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &leadEmailNotificationsEnabled, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt, &tokenID, &expiresAt, &usedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.User{}, "", ErrNotFound
 		}
 		return domain.User{}, "", err
 	}
 
+	user.LeadEmailNotificationsEnabled = intToBool(leadEmailNotificationsEnabled)
 	user.IsSuspended = intToBool(isSuspended)
 	user.SuspendedAt = parseOptionalTime(suspendedAt)
 	user.CreatedAt = parseTime(createdAt)
@@ -1281,7 +1292,7 @@ func (s *Store) ListPartnersWithStats(ctx context.Context, limit, offset int) ([
 
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT u.id, u.name, u.username, u.email, u.role, u.partner_code, u.is_suspended, u.suspended_reason, u.created_at,
+		`SELECT u.id, u.name, u.username, u.email, u.role, u.partner_code, u.lead_email_notifications_enabled, u.is_suspended, u.suspended_reason, u.created_at,
 			COUNT(l.id) AS total_leads,
 			COALESCE(SUM(CASE WHEN l.status = 'qualified' THEN 1 ELSE 0 END), 0) AS qualified_leads,
 			COALESCE(SUM(CASE WHEN l.status = 'won' THEN 1 ELSE 0 END), 0) AS won_leads,
@@ -1304,6 +1315,7 @@ func (s *Store) ListPartnersWithStats(ctx context.Context, limit, offset int) ([
 	for rows.Next() {
 		var partner domain.PartnerWithStats
 		var createdAt string
+		var leadEmailNotificationsEnabled int
 		var isSuspended int
 		if err := rows.Scan(
 			&partner.ID,
@@ -1312,6 +1324,7 @@ func (s *Store) ListPartnersWithStats(ctx context.Context, limit, offset int) ([
 			&partner.Email,
 			&partner.Role,
 			&partner.PartnerCode,
+			&leadEmailNotificationsEnabled,
 			&isSuspended,
 			&partner.SuspendedReason,
 			&createdAt,
@@ -1322,6 +1335,7 @@ func (s *Store) ListPartnersWithStats(ctx context.Context, limit, offset int) ([
 		); err != nil {
 			return nil, 0, err
 		}
+		partner.LeadEmailNotificationsEnabled = intToBool(leadEmailNotificationsEnabled)
 		partner.IsSuspended = intToBool(isSuspended)
 		partner.CreatedAt = parseTime(createdAt)
 		partners = append(partners, partner)
@@ -1503,6 +1517,7 @@ type userAuthScanner interface {
 
 func scanUserAuth(row userAuthScanner) (domain.UserAuth, error) {
 	var user domain.UserAuth
+	var leadEmailNotificationsEnabled int
 	var isSuspended int
 	var suspendedAt string
 	var createdAt string
@@ -1514,6 +1529,7 @@ func scanUserAuth(row userAuthScanner) (domain.UserAuth, error) {
 		&user.PasswordHash,
 		&user.Role,
 		&user.PartnerCode,
+		&leadEmailNotificationsEnabled,
 		&isSuspended,
 		&user.SuspendedReason,
 		&suspendedAt,
@@ -1524,6 +1540,7 @@ func scanUserAuth(row userAuthScanner) (domain.UserAuth, error) {
 		}
 		return domain.UserAuth{}, err
 	}
+	user.LeadEmailNotificationsEnabled = intToBool(leadEmailNotificationsEnabled)
 	user.IsSuspended = intToBool(isSuspended)
 	user.SuspendedAt = parseOptionalTime(suspendedAt)
 	user.CreatedAt = parseTime(createdAt)
@@ -1972,7 +1989,7 @@ func (s *Store) ListClients(ctx context.Context, limit, offset int) ([]domain.Us
 
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT id, name, username, email, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
+		`SELECT id, name, username, email, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at
 		 FROM users
 		 WHERE role = 'client'
 		 ORDER BY name ASC
@@ -1988,12 +2005,14 @@ func (s *Store) ListClients(ctx context.Context, limit, offset int) ([]domain.Us
 	clients := []domain.User{}
 	for rows.Next() {
 		var user domain.User
+		var leadEmailNotificationsEnabled int
 		var isSuspended int
 		var suspendedAt string
 		var createdAt string
-		if err := rows.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &leadEmailNotificationsEnabled, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt); err != nil {
 			return nil, 0, err
 		}
+		user.LeadEmailNotificationsEnabled = intToBool(leadEmailNotificationsEnabled)
 		user.IsSuspended = intToBool(isSuspended)
 		user.SuspendedAt = parseOptionalTime(suspendedAt)
 		user.CreatedAt = parseTime(createdAt)
@@ -2893,6 +2912,28 @@ func (s *Store) UpdateUserProfile(ctx context.Context, id string, name string, e
 		name,
 		strings.ToLower(strings.TrimSpace(email)),
 		id,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) UpdateLeadEmailNotificationsEnabled(ctx context.Context, userID string, enabled bool) error {
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE users
+		 SET lead_email_notifications_enabled = ?
+		 WHERE id = ?`,
+		boolToInt(enabled),
+		userID,
 	)
 	if err != nil {
 		return err
