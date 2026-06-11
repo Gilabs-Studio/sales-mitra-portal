@@ -111,6 +111,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
   const [maintStart, setMaintStart] = React.useState("");
   const [maintEnd, setMaintEnd] = React.useState("");
   const [maintLimit, setMaintLimit] = React.useState(12);
+  const [maintDuration, setMaintDuration] = React.useState("1");
 
   // Maintenance usage log form
   const [logDesc, setLogDesc] = React.useState("");
@@ -250,12 +251,33 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
   // Save/setup maintenance
   const handleSaveMaintenance = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!maintPackage.trim() || !maintStart || !maintEnd) return;
+    if (!maintPackage.trim()) return;
+
+    const getDatesForDuration = (durationMonths: number) => {
+      const start = new Date();
+      const end = new Date();
+      end.setMonth(start.getMonth() + durationMonths);
+      
+      const formatDate = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+      
+      return {
+        startDate: formatDate(start),
+        endDate: formatDate(end)
+      };
+    };
+
+    const durationMonths = Number(maintDuration);
+    const { startDate, endDate } = getDatesForDuration(durationMonths);
 
     const payload = {
       packageName: maintPackage,
-      startDate: maintStart,
-      endDate: maintEnd,
+      startDate,
+      endDate,
       quotaLimit: Number(maintLimit),
       quotaUsed: editingMaintItem ? Number(editingMaintItem.quotaUsed) : 0,
     };
@@ -271,6 +293,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
           setMaintPackage("");
           setMaintStart("");
           setMaintEnd("");
+          setMaintDuration("1");
           setMaintLimit(12);
         },
       });
@@ -281,6 +304,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
           setMaintPackage("");
           setMaintStart("");
           setMaintEnd("");
+          setMaintDuration("1");
           setMaintLimit(12);
         },
       });
@@ -723,6 +747,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                         setMaintStart("");
                         setMaintEnd("");
                         setMaintLimit(12);
+                        setMaintDuration("1");
                         setIsMaintSetupOpen(true);
                       }}
                       className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
@@ -752,6 +777,17 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                                   setMaintStart(m.startDate);
                                   setMaintEnd(m.endDate);
                                   setMaintLimit(m.quotaLimit);
+                                  
+                                  const diffMonths = (startStr: string, endStr: string) => {
+                                    const start = new Date(startStr);
+                                    const end = new Date(endStr);
+                                    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 1;
+                                    const diffTime = Math.abs(end.getTime() - start.getTime());
+                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                    const mCount = Math.round(diffDays / 30.4375);
+                                    return mCount <= 0 ? 1 : mCount;
+                                  };
+                                  setMaintDuration(String(diffMonths(m.startDate, m.endDate)));
                                   setIsMaintSetupOpen(true);
                                 }}
                                 className="inline-flex min-h-8 items-center justify-center rounded bg-secondary px-2.5 py-1 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
@@ -1155,31 +1191,24 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                     required
                     value={maintPackage}
                     onChange={(e) => setMaintPackage(e.target.value)}
-                    placeholder="Paket Standard 12 Request/Tahun"
+                    placeholder="Paket Standard 10 Request/Bulan"
                   />
                 </Field>
                 <Field className="space-y-1">
-                  <FieldLabel htmlFor="maint-start">Tanggal Mulai</FieldLabel>
-                  <Input
-                    id="maint-start"
-                    type="date"
-                    required
-                    value={maintStart}
-                    onChange={(e) => setMaintStart(e.target.value)}
-                  />
+                  <FieldLabel htmlFor="maint-duration">Durasi Layanan</FieldLabel>
+                  <Select
+                    id="maint-duration"
+                    value={maintDuration}
+                    onChange={(e) => setMaintDuration(e.target.value)}
+                  >
+                    <option value="1">1 Bulan</option>
+                    <option value="3">3 Bulan</option>
+                    <option value="6">6 Bulan</option>
+                    <option value="12">12 Bulan (1 Tahun)</option>
+                  </Select>
                 </Field>
                 <Field className="space-y-1">
-                  <FieldLabel htmlFor="maint-end">Tanggal Akhir</FieldLabel>
-                  <Input
-                    id="maint-end"
-                    type="date"
-                    required
-                    value={maintEnd}
-                    onChange={(e) => setMaintEnd(e.target.value)}
-                  />
-                </Field>
-                <Field className="space-y-1">
-                  <FieldLabel htmlFor="maint-limit">Batas Kuota Layanan (Jumlah Request)</FieldLabel>
+                  <FieldLabel htmlFor="maint-limit">Batas Kuota Request (Per Bulan)</FieldLabel>
                   <Input
                     id="maint-limit"
                     type="number"

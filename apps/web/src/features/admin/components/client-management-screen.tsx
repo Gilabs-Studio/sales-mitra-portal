@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2, Key, ArrowRight, ShieldAlert } from "lucide-react";
+import { Plus, Key, ShieldAlert, Eye, Ban } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
@@ -167,12 +167,7 @@ export function ClientManagementScreen() {
                     {clients.map((c: any) => (
                       <tr key={c.id} className="align-middle hover:bg-secondary/40 transition-colors">
                         <td className="border-b border-border px-4 py-3 font-semibold text-foreground">
-                          <Link
-                            href={`/admin/clients/${c.id}`}
-                            className="hover:text-primary transition-colors cursor-pointer"
-                          >
-                            {c.name}
-                          </Link>
+                          {c.name}
                         </td>
                         <td className="border-b border-border px-4 py-3 text-muted-foreground">
                           {c.email}
@@ -192,25 +187,31 @@ export function ClientManagementScreen() {
                           {formatDate(c.createdAt)}
                         </td>
                         <td className="border-b border-border px-4 py-3 text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-1.5">
                             <Link
                               href={`/admin/clients/${c.id}`}
-                              className="inline-flex min-h-8 items-center justify-center gap-1 rounded bg-secondary px-3 py-1.5 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
+                              title="Detail & Project"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer transition-colors"
                             >
-                              Detail & Project
-                              <ArrowRight className="h-3 w-3" />
+                              <Eye className="h-4 w-4" />
                             </Link>
                             <button
                               onClick={() => handleTriggerReset(c.id)}
-                              className="inline-flex min-h-8 items-center justify-center rounded bg-secondary px-3 py-1.5 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
+                              title="Reset Sandi"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer transition-colors"
                             >
-                              Reset Sandi
+                              <Key className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleToggleStatusTrigger(c.id, c.name, c.isSuspended)}
-                              className="inline-flex min-h-8 items-center justify-center rounded bg-secondary px-3 py-1.5 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
+                              title={c.isSuspended ? "Aktifkan Akun" : "Tangguhkan Akun"}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer transition-colors"
                             >
-                              {c.isSuspended ? "Aktifkan" : "Tangguhkan"}
+                              {c.isSuspended ? (
+                                <ShieldAlert className="h-4 w-4 text-destructive" />
+                              ) : (
+                                <Ban className="h-4 w-4" />
+                              )}
                             </button>
                           </div>
                         </td>

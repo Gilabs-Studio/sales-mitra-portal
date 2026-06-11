@@ -163,3 +163,13 @@ export async function updateProjectProgress(projectId: string, progressId: strin
   const response = await apiClient.patch<ApiEnvelope<any>>(`/admin/projects/${projectId}/progress/${progressId}`, payload);
   return unwrapApiResponse(response.data);
 }
+
+export async function getAllMaintenanceLogs() {
+  const response = await apiClient.get<ApiEnvelope<any[]>>("/admin/maintenance-logs");
+  return unwrapApiResponse(response.data);
+}
+
+export async function updateMaintenanceLogStatus(logId: string, status: string) {
+  const response = await apiClient.patch<ApiEnvelope<any>>(`/admin/maintenance-logs/${logId}/status`, { status });
+  return unwrapApiResponse(response.data);
+}

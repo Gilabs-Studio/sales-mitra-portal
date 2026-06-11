@@ -5,14 +5,58 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
-import { useClientDashboard, useCreateMaintenanceRequestGeneric } from "../hooks/use-client";
+import { useClientDashboard, useCreateMaintenanceRequestGeneric, useClientNotifications } from "../hooks/use-client";
 import { formatCurrency } from "@/lib/utils";
+
+// ─── Status Badge ─────────────────────────────────────────────────────────────
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    active: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+    in_progress: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+    completed: "bg-muted text-muted-foreground border-border",
+    on_hold: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  };
+  const labels: Record<string, string> = {
+    active: "Aktif",
+    in_progress: "Dalam Pengerjaan",
+    completed: "Selesai",
+    on_hold: "Ditahan",
+  };
+  return (
+    <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${map[status] ?? "bg-muted text-muted-foreground border-border"}`}>
+      {labels[status] ?? status}
+    </span>
+  );
+}
+
+// ─── Stat Card ────────────────────────────────────────────────────────────────
+function StatCard({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  accent?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card px-6 py-5 flex flex-col gap-1 min-w-0">
+      <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground truncate">{label}</p>
+      <p className={`text-3xl font-extrabold tracking-tight truncate ${accent ?? "text-foreground"}`}>{value}</p>
+      {sub && <p className="text-xs text-muted-foreground truncate">{sub}</p>}
+    </div>
+  );
+}
 
 export function ClientDashboardScreen() {
   const auth = useAuthGuard("client");
   const t = useTranslations("client");
   const dashboard = useClientDashboard();
   const reportMutation = useCreateMaintenanceRequestGeneric();
+  const [notifPage, setNotifPage] = React.useState(1);
+  const notificationsQuery = useClientNotifications(notifPage, 8);
 
   // Quick Action form state
   const [isReportOpen, setIsReportOpen] = React.useState(false);
@@ -26,16 +70,11 @@ export function ClientDashboardScreen() {
 
   const data = dashboard.data;
 
-  // Sync selected project and prefill first maintenance ID
   const handleProjectSelect = (projId: string) => {
     setSelectedProjectId(projId);
     if (data?.maintenance) {
       const filtered = data.maintenance.filter((m) => m.projectId === projId && m.quotaUsed < m.quotaLimit);
-      if (filtered.length > 0) {
-        setSelectedMaintId(filtered[0].id);
-      } else {
-        setSelectedMaintId("");
-      }
+      setSelectedMaintId(filtered.length > 0 ? filtered[0].id : "");
     }
   };
 
@@ -46,11 +85,7 @@ export function ClientDashboardScreen() {
       setSelectedProjectId(firstProjId);
       if (data.maintenance) {
         const filtered = data.maintenance.filter((m) => m.projectId === firstProjId && m.quotaUsed < m.quotaLimit);
-        if (filtered.length > 0) {
-          setSelectedMaintId(filtered[0].id);
-        } else {
-          setSelectedMaintId("");
-        }
+        setSelectedMaintId(filtered.length > 0 ? filtered[0].id : "");
       }
     }
     setIsReportOpen(true);
@@ -59,279 +94,320 @@ export function ClientDashboardScreen() {
   const handleReportSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProjectId || !selectedMaintId || !reportDesc.trim()) return;
-
-    reportMutation.mutate({
-      projectId: selectedProjectId,
-      payload: {
-        maintenanceId: selectedMaintId,
-        description: reportDesc,
+    reportMutation.mutate(
+      { projectId: selectedProjectId, payload: { maintenanceId: selectedMaintId, description: reportDesc } },
+      {
+        onSuccess: () => {
+          setIsReportOpen(false);
+          setReportDesc("");
+        },
       }
-    }, {
-      onSuccess: () => {
-        setIsReportOpen(false);
-        setReportDesc("");
-        alert("Laporan kendala/bug berhasil dikirim.");
-      }
-    });
+    );
   };
 
-  // Find active maintenance packages for the selected project
   const availableMaintenance = data?.maintenance?.filter((m) => m.projectId === selectedProjectId && m.quotaUsed < m.quotaLimit) ?? [];
 
   return (
     <AppShell user={auth.user}>
-      <div className="max-w-5xl mx-auto space-y-12 py-8 px-4 font-sans text-foreground">
-        
-        {/* Welcome Section */}
-        <section className="space-y-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            Portal Klien GiLabs
-          </p>
-          <h1 className="text-4xl font-extrabold tracking-tight text-foreground md:text-5xl">
-            Halo, {auth.user.name}
-          </h1>
-          <p className="max-w-2xl text-base text-muted-foreground leading-relaxed">
-            Selamat datang di pusat kendali dan pemantauan project IT Anda.
-          </p>
-        </section>
+      {/* ── Page Container ─────────────────────────────────────────────────── */}
+      <div className="mx-auto max-w-screen-xl space-y-8 px-6 py-8 font-sans text-foreground lg:px-10">
 
-        {/* Quick Action Trigger */}
-        <section className="border border-border rounded-lg bg-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        {/* ── Header ───────────────────────────────────────────────────────── */}
+        <div className="flex items-start justify-between gap-6">
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-foreground">Layanan Cepat</h3>
-            <p className="text-xs text-muted-foreground">Laporkan bug, kendala teknis, atau minta request pengerjaan maintenance baru secara instan.</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+              Portal Klien GiLabs
+            </p>
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground lg:text-4xl">
+              Halo, {auth.user.name}
+            </h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Pusat pemantauan dan kendali project IT Anda.
+            </p>
           </div>
           <button
             onClick={openReportModal}
-            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-xs font-extrabold text-primary-foreground hover:opacity-90 transition-all cursor-pointer whitespace-nowrap"
+            disabled={dashboard.isLoading || !data?.projects?.length}
+            className="hidden sm:inline-flex shrink-0 min-h-10 items-center justify-center rounded-lg bg-primary px-5 py-2 text-xs font-extrabold text-primary-foreground hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0 transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
           >
             Laporkan Kendala / Bug
           </button>
-        </section>
+        </div>
 
+        {/* ── Stats Bar ────────────────────────────────────────────────────── */}
         {dashboard.isLoading ? (
-          <div className="h-64 animate-pulse rounded-lg bg-muted" />
-        ) : dashboard.isError ? (
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-24 animate-pulse rounded-lg bg-muted" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard label="Total Project" value={data?.totalProjects ?? 0} />
+            <StatCard label="Project Aktif" value={data?.activeProjects ?? 0} accent="text-primary" />
+            <StatCard
+              label="Invoice Belum Bayar"
+              value={data?.unpaidInvoicesCount ?? 0}
+              accent={(data?.unpaidInvoicesCount ?? 0) > 0 ? "text-destructive" : "text-foreground"}
+            />
+            <StatCard
+              label="Total Tagihan"
+              value={formatCurrency(data?.unpaidInvoicesAmount ?? 0)}
+              sub="belum terbayar"
+              accent={(data?.unpaidInvoicesAmount ?? 0) > 0 ? "text-destructive" : "text-foreground"}
+            />
+          </div>
+        )}
+
+        {/* ── Main Content: 3 columns on desktop ──────────────────────────── */}
+        {dashboard.isError ? (
           <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm font-semibold text-destructive">
             Gagal memuat data dashboard.
           </div>
-        ) : (
-          <div className="grid gap-12 md:grid-cols-2">
-            
-            {/* Left side: Project Saya */}
-            <div className="space-y-6">
-              <h2 className="text-xl font-extrabold tracking-tight text-foreground">
-                Project Saya
-              </h2>
-              <div className="space-y-4">
+        ) : !dashboard.isLoading && (
+          <div className="grid gap-6 lg:grid-cols-3">
+
+            {/* ── Column 1: Projects ──────────────────────────────────────── */}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-extrabold tracking-tight text-foreground">Project Saya</h2>
+                <Link href="/client/projects" className="text-xs font-semibold text-primary hover:underline cursor-pointer">
+                  Lihat Semua →
+                </Link>
+              </div>
+              <div className="flex flex-col gap-3">
                 {data?.projects && data.projects.length > 0 ? (
                   data.projects.map((p) => (
                     <Link
                       key={p.id}
                       href={`/client/projects/${p.id}`}
-                      className="block rounded-lg border border-border bg-card p-6 hover:bg-secondary/40 transition-all cursor-pointer space-y-3"
+                      className="block rounded-lg border border-border bg-card p-4 hover:bg-secondary/40 hover:border-primary/30 transition-all cursor-pointer group"
                     >
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-primary border border-border px-2 py-0.5 rounded">
-                          {p.status}
-                        </span>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h3 className="text-sm font-extrabold text-foreground tracking-tight leading-snug group-hover:text-primary transition-colors line-clamp-1">
+                          {p.name}
+                        </h3>
+                        <StatusBadge status={p.status} />
                       </div>
-                      <h3 className="text-lg font-extrabold text-foreground tracking-tight">
-                        {p.name}
-                      </h3>
-                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                        {p.description}
+                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mb-3">
+                        {p.description || "—"}
                       </p>
-                      <div className="text-[11px] text-muted-foreground pt-2 border-t border-border/40">
-                        Dimulai: {p.startDate}
+                      <div className="text-[11px] text-muted-foreground border-t border-border/40 pt-2 flex justify-between">
+                        <span>Mulai: {p.startDate}</span>
+                        <span className="text-primary text-[10px] font-bold">Lihat Detail →</span>
                       </div>
                     </Link>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground leading-6">
-                    Anda belum memiliki project terdaftar di portal ini.
-                  </p>
+                  <div className="rounded-lg border border-dashed border-border p-8 text-center">
+                    <p className="text-sm text-muted-foreground">Belum ada project terdaftar.</p>
+                  </div>
+                )}
+              </div>
+              {/* Mobile report button */}
+              <button
+                onClick={openReportModal}
+                disabled={!data?.projects?.length}
+                className="sm:hidden mt-2 inline-flex w-full min-h-10 items-center justify-center rounded-lg bg-primary px-5 py-2 text-xs font-extrabold text-primary-foreground hover:opacity-90 transition-all cursor-pointer disabled:opacity-40"
+              >
+                Laporkan Kendala / Bug
+              </button>
+            </div>
+
+            {/* ── Column 2: Maintenance ───────────────────────────────────── */}
+            <div className="flex flex-col gap-4">
+              <h2 className="text-base font-extrabold tracking-tight text-foreground">Maintenance Aktif</h2>
+              <div className="flex flex-col gap-3">
+                {data?.maintenance && data.maintenance.length > 0 ? (
+                  data.maintenance.map((m) => {
+                    const remaining = m.quotaLimit - m.quotaUsed;
+                    const pct = m.quotaLimit > 0 ? Math.min((m.quotaUsed / m.quotaLimit) * 100, 100) : 0;
+                    const proj = data.projects.find((p) => p.id === m.projectId);
+                    return (
+                      <div key={m.id} className="rounded-lg border border-border bg-card p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground truncate">
+                              {proj?.name ?? "—"}
+                            </p>
+                            <p className="text-sm font-extrabold text-foreground mt-0.5 truncate">{m.packageName}</p>
+                          </div>
+                          <span className="shrink-0 rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
+                            Aktif
+                          </span>
+                        </div>
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-[11px] text-muted-foreground">
+                            <span>Kuota Bulan Ini</span>
+                            <span className="font-bold text-foreground">{m.quotaUsed}/{m.quotaLimit}</span>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${pct >= 90 ? "bg-destructive" : pct >= 70 ? "bg-amber-500" : "bg-primary"}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/40">
+                          <span>Sisa: <strong className="text-foreground">{remaining} req</strong></span>
+                          <span>Exp: {m.endDate}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border p-8 text-center">
+                    <p className="text-sm text-muted-foreground">Belum ada paket maintenance aktif.</p>
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Right side: Maintenance & Activity */}
-            <div className="space-y-12">
-              {/* Maintenance Quota Status */}
-              <div className="space-y-6">
-                <h2 className="text-xl font-extrabold tracking-tight text-foreground">
-                  Maintenance Aktif
-                </h2>
-                <div className="space-y-4">
-                  {data?.maintenance && data.maintenance.length > 0 ? (
-                    data.maintenance.map((m) => {
-                      const remaining = m.quotaLimit - m.quotaUsed;
-                      const project = data.projects.find((p) => p.id === m.projectId);
-                      return (
-                        <div
-                          key={m.id}
-                          className="rounded-lg border border-border bg-card p-5 space-y-3"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="text-xs font-bold text-muted-foreground uppercase">{project?.name}</h4>
-                              <h3 className="text-sm font-extrabold text-foreground mt-0.5">{m.packageName}</h3>
-                            </div>
-                            <span className="rounded bg-teal-500/10 px-2 py-0.5 text-[10px] font-bold text-teal-600">
-                              Aktif
-                            </span>
-                          </div>
-                          <div className="space-y-1.5">
-                            <div className="flex justify-between text-xs text-muted-foreground">
-                              <span>Pemakaian kuota</span>
-                              <span className="font-bold text-foreground">{m.quotaUsed} / {m.quotaLimit} Request</span>
-                            </div>
-                            <div className="h-2 w-full rounded bg-muted overflow-hidden">
-                              <div
-                                className="h-full bg-primary"
-                                style={{ width: `${Math.min((m.quotaUsed / m.quotaLimit) * 100, 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                          <div className="flex justify-between text-[11px] text-muted-foreground pt-1">
-                            <span>Sisa Kuota: <strong>{remaining} request</strong></span>
-                            <span>Exp: {m.endDate}</span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="text-sm text-muted-foreground leading-6">
-                      Belum ada paket maintenance aktif saat ini.
-                    </p>
-                  )}
-                </div>
+            {/* ── Column 3: Recent Activity ───────────────────────────────── */}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-extrabold tracking-tight text-foreground">Aktivitas Terbaru</h2>
+                {notificationsQuery.data && notificationsQuery.data.totalPages > 1 && (
+                  <div className="flex gap-1">
+                    <button
+                      disabled={notifPage <= 1}
+                      onClick={() => setNotifPage((p) => Math.max(1, p - 1))}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded border border-border text-[10px] font-bold disabled:opacity-40 cursor-pointer hover:bg-secondary transition-colors"
+                    >‹</button>
+                    <button
+                      disabled={notifPage >= notificationsQuery.data.totalPages}
+                      onClick={() => setNotifPage((p) => p + 1)}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded border border-border text-[10px] font-bold disabled:opacity-40 cursor-pointer hover:bg-secondary transition-colors"
+                    >›</button>
+                  </div>
+                )}
               </div>
-
-              {/* Recent Notifications */}
-              <div className="space-y-6">
-                <h2 className="text-xl font-extrabold tracking-tight text-foreground">
-                  Notifikasi Terkini
-                </h2>
-                <div className="space-y-4 border-l border-border pl-4">
-                  {data?.notifications && data.notifications.length > 0 ? (
-                    data.notifications.slice(0, 5).map((n) => (
-                      <div key={n.id} className="relative space-y-1">
-                        <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-primary" />
-                        <h4 className="text-xs font-bold text-foreground">{n.actorName}</h4>
-                        <p className="text-xs text-muted-foreground leading-relaxed">{n.details}</p>
-                        <span className="text-[10px] text-muted-foreground/60 block">
+              <div className="flex flex-col gap-2">
+                {notificationsQuery.isLoading ? (
+                  <div className="h-64 animate-pulse rounded-lg bg-muted" />
+                ) : notificationsQuery.data?.data && notificationsQuery.data.data.length > 0 ? (
+                  notificationsQuery.data.data.map((n: any) => (
+                    <div
+                      key={n.id}
+                      className="rounded-lg border border-border bg-card px-4 py-3 space-y-1 hover:bg-secondary/30 transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary truncate">
+                          {n.action}
+                        </span>
+                        <span className="shrink-0 text-[10px] text-muted-foreground/70">
                           {new Date(n.createdAt).toLocaleDateString("id-ID", {
                             day: "numeric",
                             month: "short",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit"
                           })}
                         </span>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground leading-6 py-2">
-                      Belum ada notifikasi update terbaru.
-                    </p>
-                  )}
-                </div>
+                      <p className="text-xs text-foreground leading-relaxed line-clamp-2">{n.details}</p>
+                      <p className="text-[10px] text-muted-foreground">oleh {n.actorName}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border p-8 text-center">
+                    <p className="text-sm text-muted-foreground">Belum ada aktivitas terbaru.</p>
+                  </div>
+                )}
               </div>
             </div>
-
           </div>
         )}
       </div>
 
-      {/* Quick Action Modal Dialog Overlay */}
+      {/* ── Report Modal ───────────────────────────────────────────────────── */}
       {isReportOpen && data?.projects && data.projects.length > 0 && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-            <h2 className="text-xl font-extrabold text-foreground">Laporkan Kendala / Bug</h2>
-            <form onSubmit={handleReportSubmit} className="mt-4 space-y-4">
-              
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label htmlFor="report-project" className="text-xs font-bold text-muted-foreground uppercase">
-                    Pilih Project
-                  </label>
-                  <select
-                    id="report-project"
-                    required
-                    value={selectedProjectId}
-                    onChange={(e) => handleProjectSelect(e.target.value)}
-                    className="flex h-10 w-full rounded-lg border border-input bg-muted px-3 py-1.5 text-sm focus-visible:outline-none cursor-pointer"
-                  >
-                    {data.projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 px-4 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setIsReportOpen(false); }}
+        >
+          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-2xl">
+            <h2 className="text-lg font-extrabold text-foreground mb-1">Laporkan Kendala / Bug</h2>
+            <p className="text-xs text-muted-foreground mb-5">Permintaan akan dikirim ke tim maintenance Anda.</p>
+
+            <form onSubmit={handleReportSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <label htmlFor="report-project" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  Project
+                </label>
+                <select
+                  id="report-project"
+                  required
+                  value={selectedProjectId}
+                  onChange={(e) => handleProjectSelect(e.target.value)}
+                  className="flex h-10 w-full rounded-lg border border-input bg-muted px-3 text-sm focus-visible:outline-none cursor-pointer"
+                >
+                  {data.projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="report-maint" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  Paket Maintenance
+                </label>
+                <select
+                  id="report-maint"
+                  required
+                  value={selectedMaintId}
+                  onChange={(e) => setSelectedMaintId(e.target.value)}
+                  className="flex h-10 w-full rounded-lg border border-input bg-muted px-3 text-sm focus-visible:outline-none cursor-pointer"
+                >
+                  {availableMaintenance.length > 0 ? (
+                    availableMaintenance.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.packageName} (Sisa: {m.quotaLimit - m.quotaUsed} req)
                       </option>
-                    ))}
-                  </select>
-                </div>
+                    ))
+                  ) : (
+                    <option value="">-- Tidak ada paket dengan sisa kuota --</option>
+                  )}
+                </select>
+              </div>
 
-                <div className="space-y-1">
-                  <label htmlFor="report-maint" className="text-xs font-bold text-muted-foreground uppercase">
-                    Pilih Paket / Layanan
-                  </label>
-                  <select
-                    id="report-maint"
-                    required
-                    value={selectedMaintId}
-                    onChange={(e) => setSelectedMaintId(e.target.value)}
-                    className="flex h-10 w-full rounded-lg border border-input bg-muted px-3 py-1.5 text-sm focus-visible:outline-none cursor-pointer"
-                  >
-                    {availableMaintenance.length > 0 ? (
-                      availableMaintenance.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.packageName} (Sisa: {m.quotaLimit - m.quotaUsed} request)
-                        </option>
-                      ))
-                    ) : (
-                      <option value="">-- Tidak ada paket maintenance aktif dengan sisa kuota --</option>
-                    )}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="report-desc" className="text-xs font-bold text-muted-foreground uppercase">
-                    Deskripsi Masalah / Bug
-                  </label>
-                  <textarea
-                    id="report-desc"
-                    required
-                    value={reportDesc}
-                    onChange={(e) => setReportDesc(e.target.value)}
-                    placeholder="Tuliskan deskripsi kendala teknis atau perbaikan yang dibutuhkan secara detail..."
-                    className="flex min-h-[100px] w-full rounded-lg border border-input bg-muted p-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  />
-                </div>
+              <div className="space-y-1">
+                <label htmlFor="report-desc" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  Deskripsi Masalah
+                </label>
+                <textarea
+                  id="report-desc"
+                  required
+                  value={reportDesc}
+                  onChange={(e) => setReportDesc(e.target.value)}
+                  placeholder="Jelaskan kendala atau bug secara detail..."
+                  className="flex min-h-[100px] w-full rounded-lg border border-input bg-muted p-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
               </div>
 
               {reportMutation.isError && (
                 <p className="text-xs font-bold text-destructive">
-                  {(reportMutation.error as any)?.response?.data?.message || (reportMutation.error as any)?.message || "Gagal mengirim laporan."}
+                  {(reportMutation.error as any)?.response?.data?.message ?? "Gagal mengirim laporan."}
                 </p>
               )}
 
-              <div className="flex justify-end gap-2 mt-6">
+              {reportMutation.isSuccess && (
+                <p className="text-xs font-bold text-emerald-600">Laporan berhasil dikirim!</p>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsReportOpen(false)}
-                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-secondary px-4 py-2 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-secondary px-4 text-xs font-bold hover:bg-border transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={reportMutation.isPending || !selectedMaintId}
-                  className="inline-flex min-h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 cursor-pointer"
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg bg-primary px-4 text-xs font-bold text-primary-foreground hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/30 active:translate-y-0 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {reportMutation.isPending ? "Mengirim..." : "Kirim Laporan"}
                 </button>
               </div>
-
             </form>
           </div>
         </div>

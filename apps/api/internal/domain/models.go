@@ -276,6 +276,7 @@ type ProjectMaintenance struct {
 type MaintenanceLog struct {
 	ID          string         `json:"id"`
 	ProjectID   string         `json:"projectId"`
+	ProjectName string         `json:"projectName,omitempty"`
 	RequestDate string         `json:"requestDate"`
 	Description string         `json:"description"`
 	Status      ProgressStatus `json:"status"`

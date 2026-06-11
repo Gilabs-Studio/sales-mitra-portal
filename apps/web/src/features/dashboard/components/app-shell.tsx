@@ -52,7 +52,7 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
     : user.role === "client"
     ? clientNav
     : partnerNav;
-  const unreadQuery = useUnreadCount(adminScope ? "admin" : "partner");
+  const unreadQuery = useUnreadCount(adminScope ? "admin" : "partner", user.role !== "client");
   const mobileDownloadUrl = process.env.NEXT_PUBLIC_MOBILE_APP_DOWNLOAD_URL;
 
   const [profileOpen, setProfileOpen] = React.useState(false);

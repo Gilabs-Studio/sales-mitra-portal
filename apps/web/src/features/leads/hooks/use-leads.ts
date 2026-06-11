@@ -59,10 +59,11 @@ export function useAdminLeads() {
   });
 }
 
-export function useUnreadCount(role: "partner" | "admin") {
+export function useUnreadCount(role: "partner" | "admin", enabled = true) {
   return useQuery({
     queryKey: [role, "leads", "unread-total"],
     queryFn: () => role === "admin" ? listAdminLeads({ page: 1, pageSize: 100 }) : listPartnerLeads({ page: 1, pageSize: 100 }),
+    enabled,
   });
 }
 

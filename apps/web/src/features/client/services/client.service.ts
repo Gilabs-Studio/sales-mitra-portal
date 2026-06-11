@@ -59,6 +59,13 @@ export async function updateClientProfile(payload: { name: string; email: string
   return unwrapApiResponse(response.data);
 }
 
+export async function getClientNotifications(page = 1, pageSize = 5) {
+  const response = await apiClient.get<ApiEnvelope<any>>("/client/notifications", {
+    params: { page, pageSize }
+  });
+  return unwrapApiResponse(response.data);
+}
+
 export async function createMaintenanceRequest(projectId: string, payload: { description: string; maintenanceId: string }) {
   const response = await apiClient.post<ApiEnvelope<MaintenanceLog>>(`/client/projects/${projectId}/maintenance-requests`, payload);
   return unwrapApiResponse(response.data);

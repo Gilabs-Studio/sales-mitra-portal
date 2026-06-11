@@ -69,12 +69,22 @@ func Open(databaseURL string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	// Use a pool so reads don't block each other (WAL mode allows concurrent reads)
+	db.SetMaxOpenConns(4)
+	db.SetMaxIdleConns(4)
 
-	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
-		db.Close()
-		return nil, err
+	pragmas := []string{
+		"PRAGMA journal_mode = WAL",
+		"PRAGMA busy_timeout = 10000", // 10s wait instead of instant fail
+		"PRAGMA foreign_keys = ON",
+		"PRAGMA cache_size = -8000",  // 8MB page cache
+		"PRAGMA synchronous = NORMAL",
+	}
+	for _, p := range pragmas {
+		if _, err := db.Exec(p); err != nil {
+			db.Close()
+			return nil, err
+		}
 	}
 
 	return db, nil
@@ -2018,6 +2028,93 @@ func (s *Store) CreateProject(ctx context.Context, p domain.Project) error {
 	return err
 }
 
+// ClientDashboardStats holds aggregated stats for the client dashboard.
+type ClientDashboardStats struct {
+	UnpaidInvoicesCount  int
+	UnpaidInvoicesAmount int64
+	Maintenance          []domain.ProjectMaintenance
+	RecentActivity       []domain.AuditLog
+}
+
+// GetClientDashboardStats fetches all dashboard aggregates for a client in 3 efficient
+// queries instead of N queries per project, eliminating the N+1 problem.
+func (s *Store) GetClientDashboardStats(ctx context.Context, clientID string) (ClientDashboardStats, error) {
+	var stats ClientDashboardStats
+
+	// 1. Unpaid invoice count + sum (single query across all client projects)
+	err := s.db.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*), COALESCE(SUM(amount), 0)
+		 FROM project_invoices
+		 WHERE project_id IN (SELECT id FROM projects WHERE client_id = ?)
+		   AND status IN ('waiting_payment', 'overdue')`,
+		clientID,
+	).Scan(&stats.UnpaidInvoicesCount, &stats.UnpaidInvoicesAmount)
+	if err != nil {
+		return stats, err
+	}
+
+	// 2. Maintenance packages for all client projects (with dynamic quota)
+	currentMonth := time.Now().Format("2006-01")
+	mRows, err := s.db.QueryContext(
+		ctx,
+		`SELECT m.id, m.project_id, m.package_name, m.start_date, m.end_date, m.quota_limit,
+			(SELECT COUNT(*) FROM project_maintenance_logs l
+			 WHERE l.project_id = m.project_id
+			   AND l.request_date LIKE ?
+			   AND l.description LIKE ('%' || m.package_name || '%')
+			) AS quota_used_dynamic,
+			m.created_at, m.updated_at
+		 FROM project_maintenance m
+		 WHERE m.project_id IN (SELECT id FROM projects WHERE client_id = ?)
+		 ORDER BY m.created_at DESC`,
+		currentMonth+"%",
+		clientID,
+	)
+	if err != nil {
+		return stats, err
+	}
+	defer mRows.Close()
+	for mRows.Next() {
+		var pm domain.ProjectMaintenance
+		var createdAt, updatedAt string
+		if err := mRows.Scan(&pm.ID, &pm.ProjectID, &pm.PackageName, &pm.StartDate, &pm.EndDate, &pm.QuotaLimit, &pm.QuotaUsed, &createdAt, &updatedAt); err != nil {
+			return stats, err
+		}
+		pm.CreatedAt = parseTime(createdAt)
+		pm.UpdatedAt = parseTime(updatedAt)
+		stats.Maintenance = append(stats.Maintenance, pm)
+	}
+	if err := mRows.Err(); err != nil {
+		return stats, err
+	}
+
+	// 3. Recent activity / audit logs (top 10 across all client projects)
+	aRows, err := s.db.QueryContext(
+		ctx,
+		`SELECT id, actor_id, actor_name, actor_role, action, target_type, target_id, details, created_at
+		 FROM audit_logs
+		 WHERE target_id IN (SELECT id FROM projects WHERE client_id = ?)
+		 ORDER BY created_at DESC
+		 LIMIT 10`,
+		clientID,
+	)
+	if err != nil {
+		return stats, err
+	}
+	defer aRows.Close()
+	for aRows.Next() {
+		var l domain.AuditLog
+		var createdAt string
+		if err := aRows.Scan(&l.ID, &l.ActorID, &l.ActorName, &l.ActorRole, &l.Action, &l.TargetType, &l.TargetID, &l.Details, &createdAt); err != nil {
+			return stats, err
+		}
+		l.CreatedAt = parseTime(createdAt)
+		stats.RecentActivity = append(stats.RecentActivity, l)
+	}
+	return stats, aRows.Err()
+}
+
 func (s *Store) ListProjects(ctx context.Context, clientID string) ([]domain.Project, error) {
 	query := `SELECT p.id, p.client_id, u.name as client_name, u.email as client_email, p.name, p.description, p.pic_name, p.pic_contact, p.start_date, p.target_end_date, p.status,
 			p.website_url, p.staging_url, p.credentials, p.documentation, p.created_at, p.updated_at
@@ -2312,12 +2409,35 @@ func (s *Store) DeleteProjectMaintenance(ctx context.Context, id string) error {
 	return nil
 }
 
+func (s *Store) CalculateMonthlyQuotaUsed(ctx context.Context, projectID string, packageName string) (int, error) {
+	currentMonth := time.Now().Format("2006-01") // YYYY-MM
+	var count int
+	err := s.db.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*)
+		 FROM project_maintenance_logs
+		 WHERE project_id = ? AND request_date LIKE ? AND description LIKE ?`,
+		projectID,
+		currentMonth+"%",
+		"["+packageName+"]%",
+	).Scan(&count)
+	return count, err
+}
+
 func (s *Store) GetProjectMaintenanceByID(ctx context.Context, id string) (domain.ProjectMaintenance, error) {
+	currentMonth := time.Now().Format("2006-01")
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, project_id, package_name, start_date, end_date, quota_limit, quota_used, created_at, updated_at
-		 FROM project_maintenance
-		 WHERE id = ?`,
+		`SELECT m.id, m.project_id, m.package_name, m.start_date, m.end_date, m.quota_limit,
+			(SELECT COUNT(*) FROM project_maintenance_logs l
+			 WHERE l.project_id = m.project_id
+			   AND l.request_date LIKE ?
+			   AND l.description LIKE ('%' || m.package_name || '%')
+			) AS quota_used_dynamic,
+			m.created_at, m.updated_at
+		 FROM project_maintenance m
+		 WHERE m.id = ?`,
+		currentMonth+"%",
 		id,
 	)
 
@@ -2335,12 +2455,22 @@ func (s *Store) GetProjectMaintenanceByID(ctx context.Context, id string) (domai
 }
 
 func (s *Store) ListProjectMaintenance(ctx context.Context, projectID string) ([]domain.ProjectMaintenance, error) {
+	currentMonth := time.Now().Format("2006-01")
+	// Use a SQL subquery to calculate monthly quota used in a single query,
+	// avoiding nested queries on an open rows cursor (SQLite deadlock).
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT id, project_id, package_name, start_date, end_date, quota_limit, quota_used, created_at, updated_at
-		 FROM project_maintenance
-		 WHERE project_id = ?
-		 ORDER BY created_at DESC`,
+		`SELECT m.id, m.project_id, m.package_name, m.start_date, m.end_date, m.quota_limit,
+			(SELECT COUNT(*) FROM project_maintenance_logs l
+			 WHERE l.project_id = m.project_id
+			   AND l.request_date LIKE ?
+			   AND l.description LIKE ('%' || m.package_name || '%')
+			) AS quota_used_dynamic,
+			m.created_at, m.updated_at
+		 FROM project_maintenance m
+		 WHERE m.project_id = ?
+		 ORDER BY m.created_at DESC`,
+		currentMonth+"%",
 		projectID,
 	)
 	if err != nil {
@@ -2452,6 +2582,96 @@ func (s *Store) DeleteMaintenanceLog(ctx context.Context, id string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (s *Store) ListAllMaintenanceLogs(ctx context.Context) ([]domain.MaintenanceLog, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT l.id, l.project_id, p.name as project_name, l.request_date, l.description, l.status, l.pic_name, l.created_at
+		 FROM project_maintenance_logs l
+		 INNER JOIN projects p ON l.project_id = p.id
+		 ORDER BY l.created_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	logs := []domain.MaintenanceLog{}
+	for rows.Next() {
+		var l domain.MaintenanceLog
+		var createdAt string
+		if err := rows.Scan(&l.ID, &l.ProjectID, &l.ProjectName, &l.RequestDate, &l.Description, &l.Status, &l.PICName, &createdAt); err != nil {
+			return nil, err
+		}
+		l.CreatedAt = parseTime(createdAt)
+		logs = append(logs, l)
+	}
+	return logs, rows.Err()
+}
+
+func (s *Store) UpdateMaintenanceLogStatus(ctx context.Context, id string, status domain.ProgressStatus) error {
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE project_maintenance_logs
+		 SET status = ?
+		 WHERE id = ?`,
+		status,
+		id,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) ListClientNotifications(ctx context.Context, clientID string, limit, offset int) ([]domain.AuditLog, int, error) {
+	var total int
+	err := s.db.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*)
+		 FROM audit_logs
+		 WHERE target_id IN (SELECT id FROM projects WHERE client_id = ?)`,
+		clientID,
+	).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT id, actor_id, actor_name, actor_role, action, target_type, target_id, details, created_at
+		 FROM audit_logs
+		 WHERE target_id IN (SELECT id FROM projects WHERE client_id = ?)
+		 ORDER BY created_at DESC
+		 LIMIT ? OFFSET ?`,
+		clientID,
+		limit,
+		offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	logs := []domain.AuditLog{}
+	for rows.Next() {
+		var l domain.AuditLog
+		var createdAt string
+		if err := rows.Scan(&l.ID, &l.ActorID, &l.ActorName, &l.ActorRole, &l.Action, &l.TargetType, &l.TargetID, &l.Details, &createdAt); err != nil {
+			return nil, 0, err
+		}
+		l.CreatedAt = parseTime(createdAt)
+		logs = append(logs, l)
+	}
+	return logs, total, rows.Err()
 }
 
 func (s *Store) CreateProjectInvoice(ctx context.Context, inv domain.ProjectInvoice) error {

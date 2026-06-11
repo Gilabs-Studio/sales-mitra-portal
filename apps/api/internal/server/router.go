@@ -145,6 +145,8 @@ func NewRouter(
 	admin.DELETE("/projects/:id/maintenance/:maintId", handler.adminDeleteMaintenance)
 	admin.POST("/projects/:id/maintenance-logs", handler.adminCreateMaintenanceLog)
 	admin.DELETE("/projects/:id/maintenance-logs/:logId", handler.adminDeleteMaintenanceLog)
+	admin.GET("/maintenance-logs", handler.adminAllMaintenanceLogs)
+	admin.PATCH("/maintenance-logs/:logId/status", handler.adminUpdateMaintenanceLogStatus)
 	admin.POST("/projects/:id/invoices", handler.adminCreateInvoice)
 	admin.PATCH("/projects/:id/invoices/:invoiceId", handler.adminUpdateInvoice)
 	admin.DELETE("/projects/:id/invoices/:invoiceId", handler.adminDeleteInvoice)
@@ -162,6 +164,7 @@ func NewRouter(
 	client.GET("/projects/:id/invoices", handler.clientProjectInvoices)
 	client.GET("/projects/:id/documents", handler.clientProjectDocuments)
 	client.GET("/projects/:id/reports", handler.clientProjectReports)
+	client.GET("/notifications", handler.clientNotifications)
 	client.PATCH("/profile", handler.updateClientProfile)
 
 	router.Static("/uploads", "./data/uploads")
@@ -1239,50 +1242,31 @@ func (h Handler) clientDashboard(c *gin.Context) {
 		return
 	}
 
-	var totalProjects int = len(projects)
 	var activeProjectsCount int
-	var unpaidInvoicesCount int
-	var unpaidInvoicesAmount int64
-	var maintenancePackages []domain.ProjectMaintenance
-	var latestNotifications []domain.AuditLog
-
 	for _, p := range projects {
 		if p.Status != domain.ProjectStatusCompleted {
 			activeProjectsCount++
 		}
-
-		invoices, _ := h.store.ListProjectInvoices(c.Request.Context(), p.ID)
-		for _, inv := range invoices {
-			if inv.Status == domain.InvoiceStatusWaitingPayment || inv.Status == domain.InvoiceStatusOverdue {
-				unpaidInvoicesCount++
-				unpaidInvoicesAmount += inv.Amount
-			}
-		}
-
-		pms, err := h.store.ListProjectMaintenance(c.Request.Context(), p.ID)
-		if err == nil {
-			maintenancePackages = append(maintenancePackages, pms...)
-		}
-
-		logs, _ := h.store.ListAuditLogs(c.Request.Context(), p.ID)
-		latestNotifications = append(latestNotifications, logs...)
 	}
 
-	// Take top 10 logs and slice
-	if len(latestNotifications) > 10 {
-		latestNotifications = latestNotifications[:10]
+	// Single call replaces N*3 per-project queries
+	stats, err := h.store.GetClientDashboardStats(c.Request.Context(), user.ID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
 	}
 
 	httpx.OK(c, "Dashboard klien", gin.H{
 		"projects":             projects,
-		"totalProjects":        totalProjects,
+		"totalProjects":        len(projects),
 		"activeProjects":       activeProjectsCount,
-		"unpaidInvoicesCount":  unpaidInvoicesCount,
-		"unpaidInvoicesAmount": unpaidInvoicesAmount,
-		"maintenance":          maintenancePackages,
-		"notifications":        latestNotifications,
+		"unpaidInvoicesCount":  stats.UnpaidInvoicesCount,
+		"unpaidInvoicesAmount": stats.UnpaidInvoicesAmount,
+		"maintenance":          stats.Maintenance,
+		"notifications":        stats.RecentActivity,
 	})
 }
+
 
 func (h Handler) clientProjects(c *gin.Context) {
 	user := currentUser(c)
@@ -1575,4 +1559,66 @@ func (h Handler) clientCreateMaintenanceRequest(c *gin.Context) {
 	}
 
 	httpx.Created(c, "Request maintenance berhasil dikirim", log)
+}
+
+func (h Handler) adminAllMaintenanceLogs(c *gin.Context) {
+	logs, err := h.store.ListAllMaintenanceLogs(c.Request.Context())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Semua log maintenance", logs)
+}
+
+func (h Handler) adminUpdateMaintenanceLogStatus(c *gin.Context) {
+	logId := c.Param("logId")
+	var input struct {
+		Status domain.ProgressStatus `json:"status"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload status tidak valid", err.Error()))
+		return
+	}
+
+	if input.Status != domain.ProgressStatusPending && input.Status != domain.ProgressStatusInProgress && input.Status != domain.ProgressStatusCompleted {
+		httpx.Fail(c, httpx.Validation("Status tidak valid", ""))
+		return
+	}
+
+	err := h.store.UpdateMaintenanceLogStatus(c.Request.Context(), logId, input.Status)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Status maintenance log diperbarui", gin.H{})
+}
+
+func (h Handler) clientNotifications(c *gin.Context) {
+	user := currentUser(c)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "5"))
+	if pageSize <= 0 || pageSize > 20 {
+		pageSize = 5
+	}
+
+	limit := pageSize
+	offset := (page - 1) * pageSize
+
+	logs, total, err := h.store.ListClientNotifications(c.Request.Context(), user.ID, limit, offset)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Notifikasi klien", gin.H{
+		"data":       logs,
+		"total":      total,
+		"page":       page,
+		"pageSize":   pageSize,
+		"totalPages": ceilDiv(total, pageSize),
+	})
 }

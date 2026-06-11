@@ -11,6 +11,7 @@ import {
   listClientProjects,
   updateClientProfile,
   createMaintenanceRequest,
+  getClientNotifications,
 } from "../services/client.service";
 
 export function useClientDashboard() {
@@ -116,5 +117,12 @@ export function useCreateMaintenanceRequestGeneric() {
       void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
       void queryClient.invalidateQueries({ queryKey: ["client", "projects", variables.projectId] });
     },
+  });
+}
+
+export function useClientNotifications(page = 1, pageSize = 5) {
+  return useQuery({
+    queryKey: ["client", "notifications", page, pageSize],
+    queryFn: () => getClientNotifications(page, pageSize),
   });
 }

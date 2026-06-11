@@ -25,6 +25,8 @@ import {
   deleteProjectInvoice,
   updateProjectProgress,
   updateUserSuspension,
+  getAllMaintenanceLogs,
+  updateMaintenanceLogStatus,
 } from "../services/admin.service";
 
 export function useAdminClients(params: { page?: number; pageSize?: number } = {}) {
@@ -128,6 +130,8 @@ export function useCreateProjectProgress(projectId: string) {
     mutationFn: (payload: any) => createProjectProgress(projectId, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
     },
   });
 }
@@ -138,6 +142,8 @@ export function useDeleteProjectProgress(projectId: string) {
     mutationFn: (progressId: string) => deleteProjectProgress(projectId, progressId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
     },
   });
 }
@@ -149,6 +155,8 @@ export function useUpdateProjectProgress(projectId: string) {
       updateProjectProgress(projectId, progressId, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
     },
   });
 }
@@ -160,6 +168,8 @@ export function useCreateProjectDocument(projectId: string) {
     mutationFn: (payload: any) => createProjectDocument(projectId, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "documents"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId] });
     },
   });
 }
@@ -170,6 +180,8 @@ export function useDeleteProjectDocument(projectId: string) {
     mutationFn: (docId: string) => deleteProjectDocument(projectId, docId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "documents"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId] });
     },
   });
 }
@@ -181,6 +193,9 @@ export function useCreateOrUpdateMaintenance(projectId: string) {
     mutationFn: (payload: any) => createOrUpdateProjectMaintenance(projectId, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "maintenance"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
     },
   });
 }
@@ -191,6 +206,9 @@ export function useCreateMaintenanceLog(projectId: string) {
     mutationFn: (payload: any) => createMaintenanceLog(projectId, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "maintenance-logs"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "maintenance"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
     },
   });
 }
@@ -201,6 +219,9 @@ export function useDeleteMaintenanceLog(projectId: string) {
     mutationFn: (logId: string) => deleteMaintenanceLog(projectId, logId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "maintenance-logs"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "maintenance"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
     },
   });
 }
@@ -212,6 +233,9 @@ export function useCreateProjectInvoice(projectId: string) {
     mutationFn: (payload: any) => createProjectInvoice(projectId, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "invoices"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
     },
   });
 }
@@ -222,6 +246,9 @@ export function useUpdateProjectInvoice(projectId: string) {
     mutationFn: ({ invoiceId, payload }: { invoiceId: string; payload: any }) => updateProjectInvoice(invoiceId, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "invoices"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
     },
   });
 }
@@ -232,6 +259,9 @@ export function useDeleteProjectInvoice(projectId: string) {
     mutationFn: (invoiceId: string) => deleteProjectInvoice(invoiceId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "invoices"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
     },
   });
 }
@@ -273,6 +303,28 @@ export function useDeleteProjectMaintenance(projectId: string) {
     mutationFn: (maintId: string) => deleteProjectMaintenance(projectId, maintId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "projects", projectId, "maintenance"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
+    },
+  });
+}
+
+export function useAllMaintenanceLogs() {
+  return useQuery({
+    queryKey: ["admin", "all-maintenance-logs"],
+    queryFn: getAllMaintenanceLogs,
+  });
+}
+
+export function useUpdateMaintenanceLogStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ logId, status }: { logId: string; status: string }) =>
+      updateMaintenanceLogStatus(logId, status),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "all-maintenance-logs"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "projects"] });
+      void queryClient.invalidateQueries({ queryKey: ["client", "dashboard"] });
     },
   });
 }
