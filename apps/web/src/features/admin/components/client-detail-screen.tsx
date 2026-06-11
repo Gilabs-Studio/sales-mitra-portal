@@ -2,20 +2,30 @@
 
 import * as React from "react";
 import { ArrowLeft, Plus, FolderKanban, Trash2, ArrowRight } from "lucide-react";
-import { Link, useRouter } from "@/i18n/routing";
+import { Link } from "@/i18n/routing";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
 import { useClientDetail, useCreateProject, useDeleteProject } from "../hooks/use-admin-projects";
 import { DeleteDialog } from "@/components/ui/delete-dialog";
+import { ApiClientError } from "@/lib/api-client";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export function ClientDetailScreen({ clientId }: { readonly clientId: string }) {
   const auth = useAuthGuard("admin");
-  const router = useRouter();
 
   const clientQuery = useClientDetail(clientId);
   const createProjectMutation = useCreateProject();
@@ -79,8 +89,8 @@ export function ClientDetailScreen({ clientId }: { readonly clientId: string }) 
         onSuccess: () => {
           setCreateOpen(false);
         },
-        onError: (err: any) => {
-          setFormError(err.message ?? "Gagal membuat project.");
+        onError: (err: unknown) => {
+          setFormError(err instanceof ApiClientError ? err.message : "Gagal membuat project.");
         },
       }
     );
@@ -155,7 +165,7 @@ export function ClientDetailScreen({ clientId }: { readonly clientId: string }) 
                 </div>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {projects.map((p: any) => (
+                  {projects.map((p: { id: string; name: string; status: string; description: string; picName: string }) => (
                     <div
                       key={p.id}
                       className="rounded-lg border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between"
@@ -228,14 +238,18 @@ export function ClientDetailScreen({ clientId }: { readonly clientId: string }) 
 
       {/* Add Project Modal */}
       {createOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
-          <div className="w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-            <h2 className="text-xl font-extrabold text-foreground">Tambah Project Klien Baru</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Daftarkan project baru untuk klien ini dan buat dashboard pantau klien.
-            </p>
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogOverlay className="bg-primary/30" />
+          <DialogContent className="max-w-lg">
+            <DialogHeader className="border-b-0 pb-2">
+              <DialogTitle>Tambah Project Klien Baru</DialogTitle>
+              <DialogDescription className="mt-1 text-xs">
+                Daftarkan project baru untuk klien ini dan buat dashboard pantau klien.
+              </DialogDescription>
+            </DialogHeader>
 
-            <form onSubmit={handleCreateProject} className="mt-4 space-y-4">
+            <DialogBody className="pt-0">
+              <form onSubmit={handleCreateProject} className="space-y-4">
               {formError && (
                 <div className="rounded bg-destructive/10 p-3 text-xs font-semibold text-destructive border border-destructive/20">
                   {formError}
@@ -330,27 +344,28 @@ export function ClientDetailScreen({ clientId }: { readonly clientId: string }) 
                 </Field>
               </FieldGroup>
 
-              <div className="mt-6 flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setCreateOpen(false)}
-                  disabled={createProjectMutation.isPending}
-                  className="cursor-pointer font-bold"
-                >
-                  Batal
-                </Button>
-                <Button
-                  type="submit"
-                  isLoading={createProjectMutation.isPending}
-                  className="cursor-pointer font-bold"
-                >
-                  Buat Project
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+                <DialogFooter className="border-t-0 px-0 pb-0 pt-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setCreateOpen(false)}
+                    disabled={createProjectMutation.isPending}
+                    className="cursor-pointer font-bold"
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="submit"
+                    isLoading={createProjectMutation.isPending}
+                    className="cursor-pointer font-bold"
+                  >
+                    Buat Project
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Delete Project dialog */}

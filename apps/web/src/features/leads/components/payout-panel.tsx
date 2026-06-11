@@ -2,7 +2,9 @@
 
 import * as React from "react";
 import { Coins, Percent, TrendingUp, Upload, Calendar, Eye, X, Check, FileText } from "lucide-react";
+import { ApiClientError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogOverlay } from "@/components/ui/dialog";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Field, FieldLabel, FieldGroup, FieldError, FieldDescription } from "@/components/ui/field";
 import { useLeadPayouts, useCreatePayout, useUpdateLeadCommission } from "../hooks/use-leads";
@@ -20,8 +22,8 @@ export function PayoutPanel({ leadId, role }: PayoutPanelProps) {
   const updateCommissionMutation = useUpdateLeadCommission(leadId);
 
   // Form states
-  const [dealAmount, setDealAmount] = React.useState<number>(0);
-  const [commissionRate, setCommissionRate] = React.useState<number>(0);
+  const [dealAmount, setDealAmount] = React.useState<number | undefined>(undefined);
+  const [commissionRate, setCommissionRate] = React.useState<number | undefined>(undefined);
   const [clientPaid, setClientPaid] = React.useState<number>(0);
   const [evidenceFile, setEvidenceFile] = React.useState<File | null>(null);
   const [filePreview, setFilePreview] = React.useState<string | null>(null);
@@ -37,38 +39,33 @@ export function PayoutPanel({ leadId, role }: PayoutPanelProps) {
 
   const payouts = queryData?.payouts ?? [];
   const summary = queryData?.summary;
-
-  // Initialize edit fields
-  React.useEffect(() => {
-    if (summary) {
-      setDealAmount(summary.dealAmount);
-      setCommissionRate(summary.commissionRate);
-    }
-  }, [summary]);
-
   const handleUpdateCommission = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     setFormSuccess(null);
+    if (!summary) return;
 
-    if (dealAmount < 0) {
+    const nextDealAmount = dealAmount ?? summary.dealAmount;
+    const nextCommissionRate = commissionRate ?? summary.commissionRate;
+
+    if (nextDealAmount < 0) {
       setFormError("Nilai deal tidak boleh negatif");
       return;
     }
-    if (commissionRate < 0 || commissionRate > 100) {
+    if (nextCommissionRate < 0 || nextCommissionRate > 100) {
       setFormError("Persen bagi hasil harus di antara 0 dan 100");
       return;
     }
 
     try {
       await updateCommissionMutation.mutateAsync({
-        dealAmount,
-        commissionRate,
+        dealAmount: nextDealAmount,
+        commissionRate: nextCommissionRate,
       });
       setFormSuccess("Bagi hasil berhasil diperbarui");
       setShowEditCommission(false);
-    } catch (err: any) {
-      setFormError(err?.message ?? "Gagal menyimpan perubahan");
+    } catch (err: unknown) {
+      setFormError(err instanceof ApiClientError ? err.message : "Gagal menyimpan perubahan");
     }
   };
 
@@ -110,8 +107,8 @@ export function PayoutPanel({ leadId, role }: PayoutPanelProps) {
       if (fileInputRef.current) fileInputRef.current.value = "";
       setShowAddPayout(false);
       void refetch();
-    } catch (err: any) {
-      setFormError(err?.message ?? "Gagal menambahkan data payout");
+    } catch (err: unknown) {
+      setFormError(err instanceof ApiClientError ? err.message : "Gagal menambahkan data payout");
     }
   };
 
@@ -141,7 +138,10 @@ export function PayoutPanel({ leadId, role }: PayoutPanelProps) {
     );
   }
 
-  const calculatedShare = clientPaid > 0 ? Math.round(clientPaid * (summary.commissionRate / 100)) : 0;
+  const summaryData = summary;
+  const effectiveDealAmount = dealAmount ?? summaryData.dealAmount;
+  const effectiveCommissionRate = commissionRate ?? summaryData.commissionRate;
+  const calculatedShare = clientPaid > 0 ? Math.round(clientPaid * (summaryData.commissionRate / 100)) : 0;
 
   return (
     <div className="space-y-5">
@@ -238,7 +238,7 @@ export function PayoutPanel({ leadId, role }: PayoutPanelProps) {
                 <Field className="space-y-1">
                   <FieldLabel className="text-[11px]">Nilai Kontrak Deal (Rp)</FieldLabel>
                   <NumericInput
-                    value={dealAmount}
+                    value={effectiveDealAmount}
                     onChange={(val) => setDealAmount(val)}
                     placeholder="Nilai total deal"
                     className="min-h-9 text-xs"
@@ -248,14 +248,14 @@ export function PayoutPanel({ leadId, role }: PayoutPanelProps) {
                   <FieldLabel className="text-[11px]">Persentase Komisi (%)</FieldLabel>
                   <input
                     type="number"
-                    value={commissionRate}
+                    value={effectiveCommissionRate}
                     min={0}
                     max={100}
                     onChange={(e) => setCommissionRate(Number(e.target.value))}
                     className="min-h-9 w-full rounded-lg border border-input bg-card px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
                   />
                   <FieldDescription className="text-[10px]">
-                    Komisi target bagi hasil mitra: <span className="font-bold text-foreground">{formatCurrency(Math.round(dealAmount * (commissionRate / 100)))}</span>
+                    Komisi target bagi hasil mitra: <span className="font-bold text-foreground">{formatCurrency(Math.round(effectiveDealAmount * (effectiveCommissionRate / 100)))}</span>
                   </FieldDescription>
                 </Field>
               </FieldGroup>
@@ -414,9 +414,10 @@ export function PayoutPanel({ leadId, role }: PayoutPanelProps) {
 
       {/* Evidence Image Lightbox Modal Overlay */}
       {activeReceiptUrl && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-          <div className="relative bg-card rounded-lg border border-border max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="p-3 border-b border-border flex items-center justify-between bg-secondary/30">
+        <Dialog open onOpenChange={(open) => !open && setActiveReceiptUrl(null)}>
+          <DialogOverlay className="bg-black/70" />
+          <DialogContent className="flex max-h-[85vh] max-w-lg flex-col overflow-hidden rounded-lg p-0" hideCloseButton>
+            <DialogHeader className="flex items-center justify-between bg-secondary/30 p-3">
               <h3 className="text-xs font-bold text-foreground flex items-center gap-1.5">
                 <FileText className="h-3.5 w-3.5 text-primary" />
                 Bukti Pembayaran Payout
@@ -428,15 +429,15 @@ export function PayoutPanel({ leadId, role }: PayoutPanelProps) {
               >
                 <X className="h-4 w-4" />
               </button>
-            </div>
-            <div className="flex-1 bg-black/5 p-4 flex items-center justify-center overflow-auto min-h-0">
+            </DialogHeader>
+            <DialogBody className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-black/5 p-4">
               <img
                 src={resolveEvidenceUrl(activeReceiptUrl)}
                 alt="Bukti Transfer Payout"
                 className="max-w-full max-h-[60vh] object-contain rounded-md"
               />
-            </div>
-            <div className="p-3 border-t border-border bg-secondary/15 flex justify-end">
+            </DialogBody>
+            <DialogFooter className="bg-secondary/15 p-3">
               <Button
                 type="button"
                 variant="secondary"
@@ -445,9 +446,9 @@ export function PayoutPanel({ leadId, role }: PayoutPanelProps) {
               >
                 Tutup
               </Button>
-            </div>
-          </div>
-        </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

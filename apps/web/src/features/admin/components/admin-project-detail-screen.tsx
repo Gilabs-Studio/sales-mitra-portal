@@ -31,6 +31,15 @@ import {
   useUpdateProjectProgress,
 } from "../hooks/use-admin-projects";
 import { DeleteDialog } from "@/components/ui/delete-dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -981,10 +990,14 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
 
       {/* Create Progress Milestone Dialog */}
       {isCreateProgressOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-            <h2 className="text-xl font-extrabold text-foreground">Tambah Milestone</h2>
-            <form onSubmit={handleAddMilestone} className="mt-4 space-y-4">
+        <Dialog open={isCreateProgressOpen} onOpenChange={setIsCreateProgressOpen}>
+          <DialogOverlay className="bg-primary/30" />
+          <DialogContent className="max-w-md">
+            <DialogHeader className="border-b-0 pb-2">
+              <DialogTitle>Tambah Milestone</DialogTitle>
+            </DialogHeader>
+            <DialogBody className="pt-0">
+              <form onSubmit={handleAddMilestone} className="space-y-4">
               <FieldGroup className="space-y-3">
                 <Field className="space-y-1">
                   <FieldLabel htmlFor="prog-title">Nama Milestone</FieldLabel>
@@ -1038,25 +1051,30 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   />
                 </Field>
               </FieldGroup>
-              <div className="flex justify-end gap-2 mt-6">
-                <Button type="button" variant="secondary" onClick={() => setIsCreateProgressOpen(false)}>
-                  Batal
-                </Button>
-                <Button type="submit" isLoading={createProgressMutation.isPending}>
-                  Tambah
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+                <DialogFooter className="border-t-0 px-0 pb-0 pt-2">
+                  <Button type="button" variant="secondary" onClick={() => setIsCreateProgressOpen(false)}>
+                    Batal
+                  </Button>
+                  <Button type="submit" isLoading={createProgressMutation.isPending}>
+                    Tambah
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Edit Progress Milestone Dialog */}
       {isEditProgressOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-            <h2 className="text-xl font-extrabold text-foreground">Edit Milestone</h2>
-            <form onSubmit={handleUpdateMilestone} className="mt-4 space-y-4">
+        <Dialog open={isEditProgressOpen} onOpenChange={setIsEditProgressOpen}>
+          <DialogOverlay className="bg-primary/30" />
+          <DialogContent className="max-w-md">
+            <DialogHeader className="border-b-0 pb-2">
+              <DialogTitle>Edit Milestone</DialogTitle>
+            </DialogHeader>
+            <DialogBody className="pt-0">
+              <form onSubmit={handleUpdateMilestone} className="space-y-4">
               <FieldGroup className="space-y-3">
                 <Field className="space-y-1">
                   <FieldLabel htmlFor="edit-prog-title">Nama Milestone</FieldLabel>
@@ -1108,25 +1126,30 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   />
                 </Field>
               </FieldGroup>
-              <div className="flex justify-end gap-2 mt-6">
-                <Button type="button" variant="secondary" onClick={() => setIsEditProgressOpen(false)}>
-                  Batal
-                </Button>
-                <Button type="submit" isLoading={updateProgressMutation.isPending}>
-                  Simpan
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+                <DialogFooter className="border-t-0 px-0 pb-0 pt-2">
+                  <Button type="button" variant="secondary" onClick={() => setIsEditProgressOpen(false)}>
+                    Batal
+                  </Button>
+                  <Button type="submit" isLoading={updateProgressMutation.isPending}>
+                    Simpan
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Upload Document Dialog */}
       {isCreateDocOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-            <h2 className="text-xl font-extrabold text-foreground">Upload Dokumen</h2>
-            <form onSubmit={handleAddDocument} className="mt-4 space-y-4">
+        <Dialog open={isCreateDocOpen} onOpenChange={setIsCreateDocOpen}>
+          <DialogOverlay className="bg-primary/30" />
+          <DialogContent className="max-w-md">
+            <DialogHeader className="border-b-0 pb-2">
+              <DialogTitle>Upload Dokumen</DialogTitle>
+            </DialogHeader>
+            <DialogBody className="pt-0">
+              <form onSubmit={handleAddDocument} className="space-y-4">
               <FieldGroup className="space-y-3">
                 <Field className="space-y-1">
                   <FieldLabel htmlFor="doc-title">Nama Dokumen</FieldLabel>
@@ -1147,25 +1170,30 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   />
                 </Field>
               </FieldGroup>
-              <div className="flex justify-end gap-2 mt-6">
-                <Button type="button" variant="secondary" onClick={() => setIsCreateDocOpen(false)}>
-                  Batal
-                </Button>
-                <Button type="submit" isLoading={createDocMutation.isPending}>
-                  Unggah
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+                <DialogFooter className="border-t-0 px-0 pb-0 pt-2">
+                  <Button type="button" variant="secondary" onClick={() => setIsCreateDocOpen(false)}>
+                    Batal
+                  </Button>
+                  <Button type="submit" isLoading={createDocMutation.isPending}>
+                    Unggah
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Configure Maintenance Dialog */}
       {isMaintSetupOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-            <h2 className="text-xl font-extrabold text-foreground">Konfigurasi Maintenance</h2>
-            <form onSubmit={handleSaveMaintenance} className="mt-4 space-y-4">
+        <Dialog open={isMaintSetupOpen} onOpenChange={setIsMaintSetupOpen}>
+          <DialogOverlay className="bg-primary/30" />
+          <DialogContent className="max-w-md">
+            <DialogHeader className="border-b-0 pb-2">
+              <DialogTitle>Konfigurasi Maintenance</DialogTitle>
+            </DialogHeader>
+            <DialogBody className="pt-0">
+              <form onSubmit={handleSaveMaintenance} className="space-y-4">
               <FieldGroup className="space-y-3">
                 <Field className="space-y-1">
                   <FieldLabel htmlFor="maint-pack">Jenis Paket Maintenance</FieldLabel>
@@ -1202,25 +1230,30 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   />
                 </Field>
               </FieldGroup>
-              <div className="flex justify-end gap-2 mt-6">
-                <Button type="button" variant="secondary" onClick={() => setIsMaintSetupOpen(false)}>
-                  Batal
-                </Button>
-                <Button type="submit" isLoading={createMaintMutation.isPending || updateMaintMutation.isPending}>
-                  Simpan
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+                <DialogFooter className="border-t-0 px-0 pb-0 pt-2">
+                  <Button type="button" variant="secondary" onClick={() => setIsMaintSetupOpen(false)}>
+                    Batal
+                  </Button>
+                  <Button type="submit" isLoading={createMaintMutation.isPending || updateMaintMutation.isPending}>
+                    Simpan
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Log Maintenance Request Dialog */}
       {isCreateMaintLogOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-            <h2 className="text-xl font-extrabold text-foreground">Catat Request Maintenance</h2>
-            <form onSubmit={handleAddMaintLog} className="mt-4 space-y-4">
+        <Dialog open={isCreateMaintLogOpen} onOpenChange={setIsCreateMaintLogOpen}>
+          <DialogOverlay className="bg-primary/30" />
+          <DialogContent className="max-w-md">
+            <DialogHeader className="border-b-0 pb-2">
+              <DialogTitle>Catat Request Maintenance</DialogTitle>
+            </DialogHeader>
+            <DialogBody className="pt-0">
+              <form onSubmit={handleAddMaintLog} className="space-y-4">
               <FieldGroup className="space-y-3">
                 <Field className="space-y-1">
                   <FieldLabel htmlFor="log-maint-select">Pilih Paket Maintenance</FieldLabel>
@@ -1272,25 +1305,30 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   />
                 </Field>
               </FieldGroup>
-              <div className="flex justify-end gap-2 mt-6">
-                <Button type="button" variant="secondary" onClick={() => setIsCreateMaintLogOpen(false)}>
-                  Batal
-                </Button>
-                <Button type="submit" isLoading={createMaintLogMutation.isPending}>
-                  Catat
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+                <DialogFooter className="border-t-0 px-0 pb-0 pt-2">
+                  <Button type="button" variant="secondary" onClick={() => setIsCreateMaintLogOpen(false)}>
+                    Batal
+                  </Button>
+                  <Button type="submit" isLoading={createMaintLogMutation.isPending}>
+                    Catat
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Create Invoice Dialog */}
       {isCreateInvoiceOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-            <h2 className="text-xl font-extrabold text-foreground">Terbitkan Invoice</h2>
-            <form onSubmit={handleAddInvoice} className="mt-4 space-y-4">
+        <Dialog open={isCreateInvoiceOpen} onOpenChange={setIsCreateInvoiceOpen}>
+          <DialogOverlay className="bg-primary/30" />
+          <DialogContent className="max-w-md">
+            <DialogHeader className="border-b-0 pb-2">
+              <DialogTitle>Terbitkan Invoice</DialogTitle>
+            </DialogHeader>
+            <DialogBody className="pt-0">
+              <form onSubmit={handleAddInvoice} className="space-y-4">
               <FieldGroup className="space-y-3">
                 <Field className="space-y-1">
                   <FieldLabel htmlFor="inv-num">No. Invoice</FieldLabel>
@@ -1355,17 +1393,18 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   />
                 </Field>
               </FieldGroup>
-              <div className="flex justify-end gap-2 mt-6">
-                <Button type="button" variant="secondary" onClick={() => setIsCreateInvoiceOpen(false)}>
-                  Batal
-                </Button>
-                <Button type="submit" isLoading={createInvoiceMutation.isPending}>
-                  Terbitkan
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+                <DialogFooter className="border-t-0 px-0 pb-0 pt-2">
+                  <Button type="button" variant="secondary" onClick={() => setIsCreateInvoiceOpen(false)}>
+                    Batal
+                  </Button>
+                  <Button type="submit" isLoading={createInvoiceMutation.isPending}>
+                    Terbitkan
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Unified delete confirmation dialog overlay */}

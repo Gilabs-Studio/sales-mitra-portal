@@ -5,12 +5,31 @@ import { Plus, Key, ShieldAlert, Eye, Ban } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
+import { ApiClientError } from "@/lib/api-client";
 import { useAdminClients, useCreateClient, useResetClientPassword, useUpdateUserSuspension } from "../hooks/use-admin-projects";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils";
+
+type ManagedClient = {
+  id: string;
+  name: string;
+  email: string;
+  isSuspended: boolean;
+  createdAt: string;
+};
 
 export function ClientManagementScreen() {
   const auth = useAuthGuard("admin");
@@ -78,8 +97,8 @@ export function ClientManagementScreen() {
             setSuccessMsg("");
           }, 2000);
         },
-        onError: (err: any) => {
-          setFormError(err.message ?? "Gagal mendaftarkan klien.");
+        onError: (err: unknown) => {
+          setFormError(err instanceof ApiClientError ? err.message : "Gagal mendaftarkan klien.");
         },
       }
     );
@@ -115,7 +134,7 @@ export function ClientManagementScreen() {
     });
   };
 
-  const clients = clientsQuery.data?.data ?? [];
+  const clients = (clientsQuery.data?.data ?? []) as ManagedClient[];
   const totalPages = clientsQuery.data?.totalPages ?? 1;
 
   return (
@@ -164,7 +183,7 @@ export function ClientManagementScreen() {
                     </tr>
                   </thead>
                   <tbody>
-                    {clients.map((c: any) => (
+                    {clients.map((c) => (
                       <tr key={c.id} className="align-middle hover:bg-secondary/40 transition-colors">
                         <td className="border-b border-border px-4 py-3 font-semibold text-foreground">
                           {c.name}
@@ -249,14 +268,18 @@ export function ClientManagementScreen() {
 
       {/* Create Client Modal */}
       {createOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-            <h2 className="text-xl font-extrabold text-foreground">Daftarkan Klien Baru</h2>
-            <p className="mt-1.5 text-xs text-muted-foreground">
-              Buat akun portal klien. Email onboarding beserta kredensial akan otomatis dikirimkan ke email tertera.
-            </p>
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogOverlay className="bg-primary/30" />
+          <DialogContent className="max-w-md">
+            <DialogHeader className="border-b-0 pb-2">
+              <DialogTitle>Daftarkan Klien Baru</DialogTitle>
+              <DialogDescription className="text-xs">
+                Buat akun portal klien. Email onboarding beserta kredensial akan otomatis dikirimkan ke email tertera.
+              </DialogDescription>
+            </DialogHeader>
 
-            <form onSubmit={handleCreateClient} className="mt-4 space-y-4">
+            <DialogBody className="pt-0">
+              <form onSubmit={handleCreateClient} className="space-y-4">
               {formError && (
                 <div className="rounded bg-destructive/10 p-3 text-xs font-semibold text-destructive border border-destructive/20 flex items-center gap-2">
                   <ShieldAlert className="h-4 w-4 shrink-0" />
@@ -318,40 +341,46 @@ export function ClientManagementScreen() {
                 </Field>
               </FieldGroup>
 
-              <div className="mt-6 flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setCreateOpen(false)}
-                  disabled={createClientMutation.isPending}
-                  className="cursor-pointer font-bold"
-                >
-                  Batal
-                </Button>
-                <Button
-                  type="submit"
-                  isLoading={createClientMutation.isPending}
-                  className="cursor-pointer font-bold"
-                >
-                  Simpan & Kirim
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+                <DialogFooter className="border-t-0 px-0 pb-0 pt-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setCreateOpen(false)}
+                    disabled={createClientMutation.isPending}
+                    className="cursor-pointer font-bold"
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="submit"
+                    isLoading={createClientMutation.isPending}
+                    className="cursor-pointer font-bold"
+                  >
+                    Simpan & Kirim
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Toggle Client Status Dialog Confirmation */}
       {toggleOpen && selectedClient && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
-          <div className="w-full max-w-sm rounded-lg border border-border bg-card p-5 shadow-xl">
-            <h2 className="text-lg font-extrabold text-foreground">
-              {selectedClient.isSuspended ? "Aktifkan Akun?" : "Tangguhkan Akun?"}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Apakah Anda yakin ingin {selectedClient.isSuspended ? "mengaktifkan kembali" : "menangguhkan"} akun klien <strong>{selectedClient.name}</strong>?
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
+        <Dialog open={toggleOpen} onOpenChange={setToggleOpen}>
+          <DialogOverlay className="bg-primary/30" />
+          <DialogContent className="max-w-sm">
+            <DialogHeader className="border-b-0 pb-2">
+              <DialogTitle className="text-lg">
+                {selectedClient.isSuspended ? "Aktifkan Akun?" : "Tangguhkan Akun?"}
+              </DialogTitle>
+            </DialogHeader>
+            <DialogBody className="pt-0">
+              <p className="text-sm leading-6 text-muted-foreground">
+                Apakah Anda yakin ingin {selectedClient.isSuspended ? "mengaktifkan kembali" : "menangguhkan"} akun klien <strong>{selectedClient.name}</strong>?
+              </p>
+            </DialogBody>
+            <DialogFooter className="border-t-0 pt-0">
               <Button type="button" variant="secondary" onClick={() => setToggleOpen(false)}>
                 Batal
               </Button>
@@ -362,9 +391,9 @@ export function ClientManagementScreen() {
               >
                 Konfirmasi
               </Button>
-            </div>
-          </div>
-        </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </AppShell>
   );

@@ -1,9 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { CalendarDays, X, Check } from "lucide-react";
+import { CalendarDays, Check } from "lucide-react";
 import { Calendar, TimeSlotPicker } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 export type ScheduledMeeting = {
@@ -19,55 +27,41 @@ type MeetingDialogProps = {
 };
 
 export function MeetingDialog({ open, onClose, onConfirm, initial }: MeetingDialogProps) {
+  if (!open) return null;
+
+  return (
+    <MeetingDialogContent
+      initial={initial}
+      onClose={onClose}
+      onConfirm={onConfirm}
+    />
+  );
+}
+
+type MeetingDialogContentProps = {
+  initial?: ScheduledMeeting | null;
+  onClose: () => void;
+  onConfirm: (meeting: ScheduledMeeting) => void;
+};
+
+function MeetingDialogContent({ initial, onClose, onConfirm }: MeetingDialogContentProps) {
   const [date, setDate] = React.useState<Date | null>(initial?.date ?? null);
   const [time, setTime] = React.useState<string | undefined>(initial?.time);
-
-  // Reset when reopened
-  React.useEffect(() => {
-    if (open) {
-      setDate(initial?.date ?? null);
-      setTime(initial?.time);
-    }
-  }, [open, initial]);
-
-  if (!open) return null;
 
   const canConfirm = !!date && !!time;
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/60"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Dialog */}
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Jadwal Meeting"
-        className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card shadow-xl"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+    <Dialog open onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogOverlay className="bg-black/60" />
+      <DialogContent className="max-w-sm">
+        <DialogHeader className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <CalendarDays className="h-4 w-4 text-primary" />
             Jadwalkan Meeting
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="cursor-pointer rounded-lg p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            aria-label="Tutup"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        </DialogHeader>
 
-        {/* Body */}
-        <div className="space-y-4 p-4">
+        <DialogBody className="space-y-4 p-4">
           <Calendar value={date} onChange={setDate} />
 
           {date && (
@@ -86,10 +80,9 @@ export function MeetingDialog({ open, onClose, onConfirm, initial }: MeetingDial
               pukul <strong>{time}</strong>
             </div>
           )}
-        </div>
+        </DialogBody>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
+        <DialogFooter className="px-4 py-3">
           <Button type="button" variant="ghost" onClick={onClose}>
             Batal
           </Button>
@@ -106,9 +99,9 @@ export function MeetingDialog({ open, onClose, onConfirm, initial }: MeetingDial
             <Check className="h-4 w-4" />
             Konfirmasi
           </Button>
-        </div>
-      </div>
-    </>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

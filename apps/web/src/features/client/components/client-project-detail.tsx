@@ -9,6 +9,15 @@ import { useAuthGuard } from "@/features/auth/hooks/use-auth";
 import { ApiClientError } from "@/lib/api-client";
 import { ArrowLeft } from "lucide-react";
 import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   useClientProjectDetail,
   useProjectMaintenance,
   useCreateMaintenanceRequest,
@@ -242,10 +251,14 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
 
       {/* Request Maintenance Dialog Overlay */}
       {isRequestMaintenanceOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-            <h2 className="text-xl font-extrabold text-foreground">Ajukan Request Maintenance</h2>
-            <form onSubmit={handleRequestMaintenanceSubmit} className="mt-4 space-y-4">
+        <Dialog open={isRequestMaintenanceOpen} onOpenChange={setIsRequestMaintenanceOpen}>
+          <DialogOverlay className="bg-primary/30" />
+          <DialogContent className="max-w-md">
+            <DialogHeader className="border-b-0 pb-2">
+              <DialogTitle>Ajukan Request Maintenance</DialogTitle>
+            </DialogHeader>
+            <DialogBody className="pt-0">
+              <form onSubmit={handleRequestMaintenanceSubmit} className="space-y-4">
               <div className="space-y-3">
                 <div className="space-y-1">
                   <label htmlFor="maint-select" className="text-xs font-bold text-muted-foreground uppercase">
@@ -288,25 +301,26 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
                     : "Gagal mengirim request."}
                 </p>
               )}
-              <div className="flex justify-end gap-2 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setIsRequestMaintenanceOpen(false)}
-                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-secondary px-4 py-2 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={requestMaintenanceMutation.isPending || !selectedMaintId}
-                  className="inline-flex min-h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 cursor-pointer"
-                >
-                  {requestMaintenanceMutation.isPending ? "Mengirim..." : "Kirim"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+                <DialogFooter className="border-t-0 px-0 pb-0 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsRequestMaintenanceOpen(false)}
+                    className="inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-secondary px-4 py-2 text-xs font-bold text-foreground hover:bg-border transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={requestMaintenanceMutation.isPending || !selectedMaintId}
+                    className="inline-flex min-h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 cursor-pointer"
+                  >
+                    {requestMaintenanceMutation.isPending ? "Mengirim..." : "Kirim"}
+                  </button>
+                </DialogFooter>
+              </form>
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
       )}
 
       {previewPdfUrl && (

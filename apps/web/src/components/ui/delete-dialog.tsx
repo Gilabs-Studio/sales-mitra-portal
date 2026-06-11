@@ -1,6 +1,15 @@
 "use client";
 
 import { Button } from "./button";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogTitle,
+} from "./dialog";
 
 type DeleteDialogProps = {
   open: boolean;
@@ -10,26 +19,27 @@ type DeleteDialogProps = {
 };
 
 export function DeleteDialog({ open, itemName, onOpenChange, onConfirm }: DeleteDialogProps) {
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-border bg-card p-5 shadow-xl">
-        <h2 className="text-lg font-extrabold text-foreground">Hapus {itemName}?</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogOverlay className="bg-primary/30" />
+      <DialogContent className="max-w-sm">
+        <DialogHeader className="border-b-0 pb-2">
+          <DialogTitle className="text-lg">Hapus {itemName}?</DialogTitle>
+        </DialogHeader>
+        <DialogBody className="pt-0">
+          <p className="text-sm leading-6 text-muted-foreground">
           Aksi ini perlu dikonfirmasi sebelum data dihapus
-        </p>
-        <div className="mt-5 flex justify-end gap-2">
+          </p>
+        </DialogBody>
+        <DialogFooter className="border-t-0 pt-0">
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
             Batal
           </Button>
           <Button type="button" variant="danger" onClick={onConfirm}>
             Hapus
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

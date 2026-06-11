@@ -6,6 +6,16 @@ import { AppShell } from "@/features/dashboard/components/app-shell";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
 import { ApiClientError } from "@/lib/api-client";
 import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   useClientDashboard,
   useCreateMaintenanceRequestGeneric,
   useClientMaintenanceActivities,
@@ -402,15 +412,18 @@ export function ClientDashboardScreen() {
 
       {/* ── Report Modal ───────────────────────────────────────────────────── */}
       {isReportOpen && data?.projects && data.projects.length > 0 && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 px-4 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) setIsReportOpen(false); }}
-        >
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-2xl">
-            <h2 className="text-lg font-extrabold text-foreground mb-1">Laporkan Kendala / Bug</h2>
-            <p className="text-xs text-muted-foreground mb-5">Permintaan akan dikirim ke tim maintenance Anda.</p>
+        <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
+          <DialogOverlay className="bg-foreground/20" />
+          <DialogContent className="max-w-md">
+            <DialogHeader className="border-b-0 pb-2">
+              <DialogTitle className="text-lg">Laporkan Kendala / Bug</DialogTitle>
+              <DialogDescription className="mt-1 text-xs">
+                Permintaan akan dikirim ke tim maintenance Anda.
+              </DialogDescription>
+            </DialogHeader>
 
-            <form onSubmit={handleReportSubmit} className="space-y-4">
+            <DialogBody className="pt-0">
+              <form onSubmit={handleReportSubmit} className="space-y-4">
               <div className="space-y-1">
                 <label htmlFor="report-project" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
                   Project
@@ -477,25 +490,26 @@ export function ClientDashboardScreen() {
                 <p className="text-xs font-bold text-emerald-600">Laporan berhasil dikirim!</p>
               )}
 
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsReportOpen(false)}
-                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-secondary px-4 text-xs font-bold hover:bg-border transition-colors cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={reportMutation.isPending || !selectedMaintId}
-                  className="inline-flex min-h-9 items-center justify-center rounded-lg bg-primary px-4 text-xs font-bold text-primary-foreground hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/30 active:translate-y-0 transition-all disabled:opacity-50 cursor-pointer"
-                >
-                  {reportMutation.isPending ? "Mengirim..." : "Kirim Laporan"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+                <DialogFooter className="border-t-0 px-0 pb-0 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsReportOpen(false)}
+                    className="inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-secondary px-4 text-xs font-bold hover:bg-border transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={reportMutation.isPending || !selectedMaintId}
+                    className="inline-flex min-h-9 items-center justify-center rounded-lg bg-primary px-4 text-xs font-bold text-primary-foreground hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/30 active:translate-y-0 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {reportMutation.isPending ? "Mengirim..." : "Kirim Laporan"}
+                  </button>
+                </DialogFooter>
+              </form>
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
       )}
     </AppShell>
   );
