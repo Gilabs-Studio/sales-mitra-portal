@@ -8,12 +8,7 @@ import {
   Layers,
   Wrench,
   FileText,
-  Plus,
-  Trash2,
-  Calendar,
   Save,
-  CheckCircle,
-  ShieldAlert,
 } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { AppShell } from "@/features/dashboard/components/app-shell";
@@ -44,8 +39,25 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileUpload } from "@/components/ui/file-upload";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import type {
+  MaintenanceLog,
+  Project,
+  ProjectDocument,
+  ProjectInvoice,
+  ProjectMaintenance,
+  ProjectProgress,
+} from "@/features/client/types/client.types";
 
 type TabType = "info" | "progress" | "docs" | "maintenance" | "invoice";
+
+type AdminProjectDetailData = {
+  project?: Project;
+  progress?: ProjectProgress[];
+  documents?: ProjectDocument[];
+  maintenance?: ProjectMaintenance[];
+  maintLogs?: MaintenanceLog[];
+  invoices?: ProjectInvoice[];
+};
 
 export function AdminProjectDetailScreen({ projectId }: { readonly projectId: string }) {
   const auth = useAuthGuard("admin");
@@ -75,25 +87,25 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
   // Modal dialog open/close states
   const [isCreateProgressOpen, setIsCreateProgressOpen] = React.useState(false);
   const [isEditProgressOpen, setIsEditProgressOpen] = React.useState(false);
-  const [editingProgressItem, setEditingProgressItem] = React.useState<any | null>(null);
+  const [editingProgressItem, setEditingProgressItem] = React.useState<ProjectProgress | null>(null);
   const [isCreateDocOpen, setIsCreateDocOpen] = React.useState(false);
   const [isCreateMaintLogOpen, setIsCreateMaintLogOpen] = React.useState(false);
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = React.useState(false);
   const [isMaintSetupOpen, setIsMaintSetupOpen] = React.useState(false);
-  const [editingMaintItem, setEditingMaintItem] = React.useState<any | null>(null);
+  const [editingMaintItem, setEditingMaintItem] = React.useState<ProjectMaintenance | null>(null);
 
   // Edit Project Info form states
-  const [name, setName] = React.useState("");
-  const [description, setDescription] = React.useState("");
-  const [picName, setPicName] = React.useState("");
-  const [picContact, setPicContact] = React.useState("");
-  const [startDate, setStartDate] = React.useState("");
-  const [targetEndDate, setTargetEndDate] = React.useState("");
-  const [status, setStatus] = React.useState("discovery");
-  const [websiteUrl, setWebsiteUrl] = React.useState("");
-  const [stagingUrl, setStagingUrl] = React.useState("");
-  const [credentials, setCredentials] = React.useState("");
-  const [documentation, setDocumentation] = React.useState("");
+  const [name, setName] = React.useState<string | undefined>(undefined);
+  const [description, setDescription] = React.useState<string | undefined>(undefined);
+  const [picName, setPicName] = React.useState<string | undefined>(undefined);
+  const [picContact, setPicContact] = React.useState<string | undefined>(undefined);
+  const [startDate, setStartDate] = React.useState<string | undefined>(undefined);
+  const [targetEndDate, setTargetEndDate] = React.useState<string | undefined>(undefined);
+  const [status, setStatus] = React.useState<string | undefined>(undefined);
+  const [websiteUrl, setWebsiteUrl] = React.useState<string | undefined>(undefined);
+  const [stagingUrl, setStagingUrl] = React.useState<string | undefined>(undefined);
+  const [credentials, setCredentials] = React.useState<string | undefined>(undefined);
+  const [documentation, setDocumentation] = React.useState<string | undefined>(undefined);
 
   // Milestone Form
   const [milestoneTitle, setMilestoneTitle] = React.useState("");
@@ -108,8 +120,6 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
 
   // Maintenance Package Form
   const [maintPackage, setMaintPackage] = React.useState("");
-  const [maintStart, setMaintStart] = React.useState("");
-  const [maintEnd, setMaintEnd] = React.useState("");
   const [maintLimit, setMaintLimit] = React.useState(12);
   const [maintDuration, setMaintDuration] = React.useState("1");
 
@@ -127,25 +137,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
   const [invDueDate, setInvDueDate] = React.useState("");
   const [invDoc, setInvDoc] = React.useState("");
 
-  const data = projectQuery.data;
-
-  // Initialize fields once data loaded
-  React.useEffect(() => {
-    if (data?.project) {
-      const p = data.project;
-      setName(p.name);
-      setDescription(p.description);
-      setPicName(p.picName);
-      setPicContact(p.picContact);
-      setStartDate(p.startDate);
-      setTargetEndDate(p.targetEndDate);
-      setStatus(p.status);
-      setWebsiteUrl(p.websiteUrl ?? "");
-      setStagingUrl(p.stagingUrl ?? "");
-      setCredentials(p.credentials ?? "");
-      setDocumentation(p.documentation ?? "");
-    }
-  }, [data]);
+  const data = projectQuery.data as AdminProjectDetailData | undefined;
 
   if (auth.isLoading || !auth.isAllowed || !auth.user) {
     return <div className="min-h-screen bg-background" />;
@@ -155,23 +147,23 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
   const handleUpdateInfo = (e: React.FormEvent) => {
     e.preventDefault();
     updateProjectMutation.mutate({
-      name,
-      description,
-      picName,
-      picContact,
-      startDate,
-      targetEndDate,
-      status,
-      websiteUrl,
-      stagingUrl,
-      credentials,
-      documentation,
+      name: name ?? data?.project?.name ?? "",
+      description: description ?? data?.project?.description ?? "",
+      picName: picName ?? data?.project?.picName ?? "",
+      picContact: picContact ?? data?.project?.picContact ?? "",
+      startDate: startDate ?? data?.project?.startDate ?? "",
+      targetEndDate: targetEndDate ?? data?.project?.targetEndDate ?? "",
+      status: status ?? data?.project?.status ?? "discovery",
+      websiteUrl: websiteUrl ?? data?.project?.websiteUrl ?? "",
+      stagingUrl: stagingUrl ?? data?.project?.stagingUrl ?? "",
+      credentials: credentials ?? data?.project?.credentials ?? "",
+      documentation: documentation ?? data?.project?.documentation ?? "",
     }, {
       onSuccess: () => alert("Informasi project berhasil diperbarui."),
     });
   };
 
-  const handleEditProgressTrigger = (item: any) => {
+  const handleEditProgressTrigger = (item: ProjectProgress) => {
     setEditingProgressItem(item);
     setMilestoneTitle(item.title);
     setMilestoneStatus(item.status);
@@ -288,13 +280,11 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
         payload,
       }, {
         onSuccess: () => {
-          setIsMaintSetupOpen(false);
-          setEditingMaintItem(null);
-          setMaintPackage("");
-          setMaintStart("");
-          setMaintEnd("");
-          setMaintDuration("1");
-          setMaintLimit(12);
+        setIsMaintSetupOpen(false);
+        setEditingMaintItem(null);
+        setMaintPackage("");
+        setMaintDuration("1");
+        setMaintLimit(12);
         },
       });
     } else {
@@ -302,8 +292,6 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
         onSuccess: () => {
           setIsMaintSetupOpen(false);
           setMaintPackage("");
-          setMaintStart("");
-          setMaintEnd("");
           setMaintDuration("1");
           setMaintLimit(12);
         },
@@ -475,7 +463,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                           id="info-name"
                           type="text"
                           required
-                          value={name}
+                          value={name ?? data?.project?.name ?? ""}
                           onChange={(e) => setName(e.target.value)}
                         />
                       </Field>
@@ -484,7 +472,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                         <Textarea
                           id="info-desc"
                           required
-                          value={description}
+                          value={description ?? data?.project?.description ?? ""}
                           onChange={(e) => setDescription(e.target.value)}
                         />
                       </Field>
@@ -494,7 +482,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                           id="info-pic"
                           type="text"
                           required
-                          value={picName}
+                          value={picName ?? data?.project?.picName ?? ""}
                           onChange={(e) => setPicName(e.target.value)}
                         />
                       </Field>
@@ -504,7 +492,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                           id="info-contact"
                           type="text"
                           required
-                          value={picContact}
+                          value={picContact ?? data?.project?.picContact ?? ""}
                           onChange={(e) => setPicContact(e.target.value)}
                         />
                       </Field>
@@ -514,7 +502,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                           id="info-start"
                           type="date"
                           required
-                          value={startDate}
+                          value={startDate ?? data?.project?.startDate ?? ""}
                           onChange={(e) => setStartDate(e.target.value)}
                         />
                       </Field>
@@ -524,7 +512,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                           id="info-target"
                           type="date"
                           required
-                          value={targetEndDate}
+                          value={targetEndDate ?? data?.project?.targetEndDate ?? ""}
                           onChange={(e) => setTargetEndDate(e.target.value)}
                         />
                       </Field>
@@ -532,7 +520,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                         <FieldLabel htmlFor="info-status">Status Project</FieldLabel>
                         <Select
                           id="info-status"
-                          value={status}
+                          value={status ?? data?.project?.status ?? "discovery"}
                           onChange={(e) => setStatus(e.target.value)}
                         >
                           <option value="discovery">Discovery</option>
@@ -550,7 +538,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                         <Input
                           id="info-web"
                           type="text"
-                          value={websiteUrl}
+                          value={websiteUrl ?? data?.project?.websiteUrl ?? ""}
                           onChange={(e) => setWebsiteUrl(e.target.value)}
                           placeholder="https://client-domain.com"
                         />
@@ -560,7 +548,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                         <Input
                           id="info-staging"
                           type="text"
-                          value={stagingUrl}
+                          value={stagingUrl ?? data?.project?.stagingUrl ?? ""}
                           onChange={(e) => setStagingUrl(e.target.value)}
                           placeholder="https://staging.gilabs.io"
                         />
@@ -569,7 +557,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                         <FieldLabel htmlFor="info-cred">Credentials (Akses Akun)</FieldLabel>
                         <Textarea
                           id="info-cred"
-                          value={credentials}
+                          value={credentials ?? data?.project?.credentials ?? ""}
                           onChange={(e) => setCredentials(e.target.value)}
                           placeholder="Username/Password CMS, panel hosting, dll."
                         />
@@ -578,7 +566,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                         <FieldLabel htmlFor="info-doc">Dokumentasi Proyek</FieldLabel>
                         <Textarea
                           id="info-doc"
-                          value={documentation}
+                          value={documentation ?? data?.project?.documentation ?? ""}
                           onChange={(e) => setDocumentation(e.target.value)}
                           placeholder="Link readme, wiki, link git, dll."
                         />
@@ -625,7 +613,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   <div className="space-y-4">
                     {data?.progress && data.progress.length > 0 ? (
                       <div className="space-y-3">
-                        {data.progress.map((p: any) => (
+                        {data.progress.map((p) => (
                           <div
                             key={p.id}
                             className="rounded-lg border border-border bg-card p-4 flex justify-between items-start gap-4 transition-all hover:shadow-sm"
@@ -698,7 +686,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   <div className="space-y-4">
                     {data?.documents && data.documents.length > 0 ? (
                       <div className="divide-y divide-border/60 rounded-lg border border-border bg-card px-4">
-                        {data.documents.map((d: any) => (
+                        {data.documents.map((d) => (
                           <div key={d.id} className="flex justify-between items-center py-3">
                             <div>
                               <h4 className="text-sm font-bold text-foreground">{d.title}</h4>
@@ -744,8 +732,6 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                       onClick={() => {
                         setEditingMaintItem(null);
                         setMaintPackage("");
-                        setMaintStart("");
-                        setMaintEnd("");
                         setMaintLimit(12);
                         setMaintDuration("1");
                         setIsMaintSetupOpen(true);
@@ -758,7 +744,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
 
                   {data?.maintenance && data.maintenance.length > 0 ? (
                     <div className="space-y-4">
-                      {data.maintenance.map((m: any) => (
+                      {data.maintenance.map((m) => (
                         <div key={m.id} className="rounded-lg border border-border bg-card p-5">
                           <div className="flex justify-between items-start">
                             <div>
@@ -774,8 +760,6 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                                 onClick={() => {
                                   setEditingMaintItem(m);
                                   setMaintPackage(m.packageName);
-                                  setMaintStart(m.startDate);
-                                  setMaintEnd(m.endDate);
                                   setMaintLimit(m.quotaLimit);
                                   
                                   const diffMonths = (startStr: string, endStr: string) => {
@@ -857,7 +841,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
 
                     {data?.maintLogs && data.maintLogs.length > 0 ? (
                       <div className="space-y-3">
-                        {data.maintLogs.map((l: any) => (
+                        {data.maintLogs.map((l) => (
                           <div
                             key={l.id}
                             className="rounded-lg border border-border bg-card p-4 flex justify-between items-start gap-4 transition-all hover:shadow-sm"
@@ -917,7 +901,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   {data?.invoices && data.invoices.length > 0 ? (
                     <div className="rounded-lg border border-border bg-card overflow-hidden">
                       <ScrollArea orientation="horizontal">
-                        <table className="w-full min-w-[600px] border-collapse text-left text-sm">
+                        <table className="w-full min-w-150 border-collapse text-left text-sm">
                           <thead className="bg-secondary text-xs uppercase text-muted-foreground">
                             <tr>
                               <th className="border-b border-border px-4 py-3">No. Invoice</th>
@@ -928,7 +912,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                             </tr>
                           </thead>
                           <tbody>
-                            {data.invoices.map((inv: any) => (
+                            {data.invoices.map((inv) => (
                               <tr
                                 key={inv.id}
                                 className="align-middle hover:bg-secondary/40 transition-colors"
@@ -1247,7 +1231,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                     onChange={(e) => setSelectedMaintLogId(e.target.value)}
                   >
                     <option value="">-- Pilih Paket --</option>
-                    {data?.maintenance?.map((m: any) => (
+                    {data?.maintenance?.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.packageName} (Sisa: {m.quotaLimit - m.quotaUsed} request)
                       </option>

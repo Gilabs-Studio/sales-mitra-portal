@@ -1,12 +1,37 @@
 "use client";
 
 import * as React from "react";
-import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
-import { useClientDashboard, useCreateMaintenanceRequestGeneric, useClientNotifications } from "../hooks/use-client";
-import { formatCurrency } from "@/lib/utils";
+import { ApiClientError } from "@/lib/api-client";
+import {
+  useClientDashboard,
+  useCreateMaintenanceRequestGeneric,
+  useClientMaintenanceActivities,
+  useClientNotifications,
+} from "../hooks/use-client";
+import { formatCurrency, formatDate } from "@/lib/utils";
+
+function translateMaintenanceStatus(status: string) {
+  if (status === "completed") return "Selesai";
+  if (status === "in_progress") return "Sedang dikerjakan";
+  return "Menunggu penanganan";
+}
+
+function getMaintenanceStatusTone(status: string) {
+  if (status === "completed") return "text-emerald-600";
+  if (status === "in_progress") return "text-blue-600";
+  return "text-amber-600";
+}
+
+type ClientNotification = {
+  id: string;
+  action: string;
+  details: string;
+  actorName: string;
+  createdAt: string;
+};
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
@@ -52,7 +77,6 @@ function StatCard({
 
 export function ClientDashboardScreen() {
   const auth = useAuthGuard("client");
-  const t = useTranslations("client");
   const dashboard = useClientDashboard();
   const reportMutation = useCreateMaintenanceRequestGeneric();
   const [notifPage, setNotifPage] = React.useState(1);
@@ -63,12 +87,14 @@ export function ClientDashboardScreen() {
   const [selectedProjectId, setSelectedProjectId] = React.useState("");
   const [selectedMaintId, setSelectedMaintId] = React.useState("");
   const [reportDesc, setReportDesc] = React.useState("");
+  const data = dashboard.data;
+  const projectIds = data?.projects.map((project) => project.id) ?? [];
+  const maintenanceActivitiesQuery = useClientMaintenanceActivities(projectIds);
+  const notificationItems = (notificationsQuery.data?.data ?? []) as ClientNotification[];
 
   if (auth.isLoading || !auth.isAllowed || !auth.user) {
     return <div className="min-h-screen bg-background" />;
   }
-
-  const data = dashboard.data;
 
   const handleProjectSelect = (projId: string) => {
     setSelectedProjectId(projId);
@@ -106,6 +132,22 @@ export function ClientDashboardScreen() {
   };
 
   const availableMaintenance = data?.maintenance?.filter((m) => m.projectId === selectedProjectId && m.quotaUsed < m.quotaLimit) ?? [];
+  const combinedActivityItems = [
+    ...maintenanceActivitiesQuery.data.map((activity) => ({
+      id: `maintenance-${activity.id}`,
+      createdAt: activity.createdAt || activity.requestDate,
+      kind: "maintenance" as const,
+      payload: activity,
+    })),
+    ...notificationItems.map((notification) => ({
+      id: `notification-${notification.id}`,
+      createdAt: notification.createdAt,
+      kind: "notification" as const,
+      payload: notification,
+    })),
+  ]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 8);
 
   return (
     <AppShell user={auth.user}>
@@ -283,33 +325,74 @@ export function ClientDashboardScreen() {
                 )}
               </div>
               <div className="flex flex-col gap-2">
-                {notificationsQuery.isLoading ? (
+                {notificationsQuery.isLoading || maintenanceActivitiesQuery.isLoading ? (
                   <div className="h-64 animate-pulse rounded-lg bg-muted" />
-                ) : notificationsQuery.data?.data && notificationsQuery.data.data.length > 0 ? (
-                  notificationsQuery.data.data.map((n: any) => (
-                    <div
-                      key={n.id}
-                      className="rounded-lg border border-border bg-card px-4 py-3 space-y-1 hover:bg-secondary/30 transition-colors"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary truncate">
-                          {n.action}
-                        </span>
-                        <span className="shrink-0 text-[10px] text-muted-foreground/70">
-                          {new Date(n.createdAt).toLocaleDateString("id-ID", {
-                            day: "numeric",
-                            month: "short",
-                          })}
-                        </span>
-                      </div>
-                      <p className="text-xs text-foreground leading-relaxed line-clamp-2">{n.details}</p>
-                      <p className="text-[10px] text-muted-foreground">oleh {n.actorName}</p>
-                    </div>
-                  ))
                 ) : (
+                  <>
+                    {combinedActivityItems.map((item) => {
+                      if (item.kind === "maintenance") {
+                        const activity = item.payload;
+                        const projectName = data?.projects.find((project) => project.id === activity.projectId)?.name;
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="rounded-lg border border-border bg-card px-4 py-3 space-y-1 hover:bg-secondary/30 transition-colors"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate text-[10px] font-extrabold uppercase tracking-wider text-primary">
+                                Maintenance
+                              </span>
+                              <span className="shrink-0 text-[10px] text-muted-foreground/70">
+                                {formatDate(item.createdAt)}
+                              </span>
+                            </div>
+                            <p className="text-xs font-semibold text-foreground leading-relaxed">
+                              {activity.description}
+                            </p>
+                            <p className={`text-[10px] font-bold ${getMaintenanceStatusTone(activity.status)}`}>
+                              {translateMaintenanceStatus(activity.status)}
+                              {projectName ? ` • ${projectName}` : ""}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              PIC: {activity.picName || "Menunggu assignment"}
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      const notification = item.payload;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="rounded-lg border border-border bg-card px-4 py-3 space-y-1 hover:bg-secondary/30 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-[10px] font-extrabold uppercase tracking-wider text-primary">
+                              {notification.action}
+                            </span>
+                            <span className="shrink-0 text-[10px] text-muted-foreground/70">
+                              {formatDate(item.createdAt)}
+                            </span>
+                          </div>
+                          <p className="line-clamp-2 text-xs leading-relaxed text-foreground">{notification.details}</p>
+                          <p className="text-[10px] text-muted-foreground">oleh {notification.actorName}</p>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+                {combinedActivityItems.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-border p-8 text-center">
                     <p className="text-sm text-muted-foreground">Belum ada aktivitas terbaru.</p>
                   </div>
+                ) : (
+                  maintenanceActivitiesQuery.isFetching && (
+                    <p className="px-1 text-[10px] text-muted-foreground">
+                      Status maintenance diperbarui otomatis.
+                    </p>
+                  )
                 )}
               </div>
             </div>
@@ -384,7 +467,9 @@ export function ClientDashboardScreen() {
 
               {reportMutation.isError && (
                 <p className="text-xs font-bold text-destructive">
-                  {(reportMutation.error as any)?.response?.data?.message ?? "Gagal mengirim laporan."}
+                  {reportMutation.error instanceof ApiClientError
+                    ? reportMutation.error.message
+                    : "Gagal mengirim laporan."}
                 </p>
               )}
 
