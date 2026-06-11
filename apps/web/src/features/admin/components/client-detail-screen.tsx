@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import type { Project, ProjectStatus } from "@/features/client/types/client.types";
 import {
   Dialog,
   DialogBody,
@@ -42,7 +43,7 @@ export function ClientDetailScreen({ clientId }: { readonly clientId: string }) 
   const [pPicContact, setPPicContact] = React.useState("");
   const [pStartDate, setPStartDate] = React.useState("");
   const [pTargetEndDate, setPTargetEndDate] = React.useState("");
-  const [pStatus, setPStatus] = React.useState("discovery");
+  const [pStatus, setPStatus] = React.useState<ProjectStatus>("discovery");
   const [formError, setFormError] = React.useState("");
 
   if (auth.isLoading || !auth.isAllowed || !auth.user) {
@@ -165,7 +166,7 @@ export function ClientDetailScreen({ clientId }: { readonly clientId: string }) 
                 </div>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {projects.map((p: { id: string; name: string; status: string; description: string; picName: string }) => (
+                  {projects.map((p: Project) => (
                     <div
                       key={p.id}
                       className="rounded-lg border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between"
@@ -223,11 +224,11 @@ export function ClientDetailScreen({ clientId }: { readonly clientId: string }) 
                 <div>
                   <h4 className="text-xs font-bold text-foreground">Tanggal Registrasi</h4>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {new Date(client?.createdAt).toLocaleDateString("id-ID", {
+                    {client?.createdAt ? new Date(client.createdAt).toLocaleDateString("id-ID", {
                       day: "numeric",
                       month: "long",
                       year: "numeric",
-                    })}
+                    }) : "-"}
                   </p>
                 </div>
               </div>
@@ -331,7 +332,7 @@ export function ClientDetailScreen({ clientId }: { readonly clientId: string }) 
                   <Select
                     id="project-status"
                     value={pStatus}
-                    onChange={(e) => setPStatus(e.target.value)}
+                    onChange={(e) => setPStatus(e.target.value as ProjectStatus)}
                   >
                     <option value="discovery">Discovery</option>
                     <option value="planning">Planning</option>

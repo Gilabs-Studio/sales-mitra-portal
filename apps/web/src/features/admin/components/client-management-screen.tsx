@@ -6,6 +6,7 @@ import { Link } from "@/i18n/routing";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
 import { ApiClientError } from "@/lib/api-client";
+import type { AdminClient } from "../types/admin.types";
 import { useAdminClients, useCreateClient, useResetClientPassword, useUpdateUserSuspension } from "../hooks/use-admin-projects";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -22,14 +23,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils";
-
-type ManagedClient = {
-  id: string;
-  name: string;
-  email: string;
-  isSuspended: boolean;
-  createdAt: string;
-};
 
 export function ClientManagementScreen() {
   const auth = useAuthGuard("admin");
@@ -134,7 +127,7 @@ export function ClientManagementScreen() {
     });
   };
 
-  const clients = (clientsQuery.data?.data ?? []) as ManagedClient[];
+  const clients: AdminClient[] = clientsQuery.data?.data ?? [];
   const totalPages = clientsQuery.data?.totalPages ?? 1;
 
   return (

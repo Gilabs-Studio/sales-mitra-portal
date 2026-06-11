@@ -1,12 +1,14 @@
 import { apiClient, unwrapApiResponse, type ApiEnvelope } from "@/lib/api-client";
 import type {
   ClientDashboardData,
+  PaginatedNotifications,
   Project,
   ProjectProgress,
   ProjectDocument,
   ProjectMaintenance,
   MaintenanceLog,
   ProjectInvoice,
+  ProjectReportData,
 } from "../types/client.types";
 
 export async function getClientDashboard() {
@@ -50,7 +52,7 @@ export async function getProjectDocuments(projectId: string) {
 }
 
 export async function getProjectReportData(projectId: string) {
-  const response = await apiClient.get<ApiEnvelope<any>>(`/client/projects/${projectId}/reports`);
+  const response = await apiClient.get<ApiEnvelope<ProjectReportData>>(`/client/projects/${projectId}/reports`);
   return unwrapApiResponse(response.data);
 }
 
@@ -60,7 +62,7 @@ export async function updateClientProfile(payload: { name: string; email: string
 }
 
 export async function getClientNotifications(page = 1, pageSize = 5) {
-  const response = await apiClient.get<ApiEnvelope<any>>("/client/notifications", {
+  const response = await apiClient.get<ApiEnvelope<PaginatedNotifications>>("/client/notifications", {
     params: { page, pageSize }
   });
   return unwrapApiResponse(response.data);

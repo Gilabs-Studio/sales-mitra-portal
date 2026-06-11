@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft, Building2, Mail, Phone, Clock, Star, Search, Info, MessageSquare } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Clock, Star, Search, Info, MessageSquare } from "lucide-react";
 import { Link, usePathname } from "@/i18n/routing";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
@@ -16,6 +16,7 @@ import {
   useLeadMessages,
   statusOptions,
 } from "@/features/leads/hooks/use-leads";
+import type { LeadFilters } from "@/features/leads/types/lead.types";
 import { serviceLabel, statusLabels } from "@/features/leads/utils/lead-labels";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { useLeadWebSocket } from "@/features/leads/hooks/use-lead-ws";
@@ -95,19 +96,15 @@ export function PartnerLeadDetailScreen({ leadId }: PartnerLeadDetailScreenProps
   const lead = usePartnerLeadDetail(leadId ?? "");
   const events = useLeadEvents(leadId ?? "", "partner");
   const leads = usePartnerLeads();
-  const [chatLimit, setChatLimit] = React.useState(15);
+  const [chatLimitByLead, setChatLimitByLead] = React.useState<Record<string, number>>({});
+  const chatLimit = chatLimitByLead[leadId] ?? 15;
   const messages = useLeadMessages(leadId ?? "", "partner", chatLimit);
-  const { page, setPage, status, setStatus, serviceType, setServiceType } = useLeadFilters();
+  const { setPage, status, setStatus, serviceType, setServiceType } = useLeadFilters();
   const [search, setSearch] = React.useState("");
   const [rightPanelOpen, setRightPanelOpen] = React.useState(true);
   const queryClient = useQueryClient();
   const pathname = usePathname();
   const isChatPage = pathname.includes("/chat");
-
-  // Reset chat limit when active lead changes
-  React.useEffect(() => {
-    setChatLimit(15);
-  }, [leadId]);
 
   // Invalidate leads queries to update sidebar/badges when lead chat is opened
   React.useEffect(() => {
@@ -163,7 +160,7 @@ export function PartnerLeadDetailScreen({ leadId }: PartnerLeadDetailScreenProps
             <div className="flex gap-2">
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
+                onChange={(e) => setStatus((e.target.value as LeadFilters["status"]) ?? "")}
                 className="flex-1 min-h-8 rounded-lg border border-input bg-background px-2 py-1 text-xs text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 <option value="">Semua Status</option>
@@ -175,7 +172,7 @@ export function PartnerLeadDetailScreen({ leadId }: PartnerLeadDetailScreenProps
               </select>
               <select
                 value={serviceType}
-                onChange={(e) => setServiceType(e.target.value as any)}
+                onChange={(e) => setServiceType((e.target.value as LeadFilters["serviceType"]) ?? "")}
                 className="flex-1 min-h-8 rounded-lg border border-input bg-background px-2 py-1 text-xs text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 <option value="">Semua Layanan</option>
@@ -294,7 +291,12 @@ export function PartnerLeadDetailScreen({ leadId }: PartnerLeadDetailScreenProps
                     title={l.companyName}
                     subtitle={`${serviceLabel(l.serviceType)} · ${l.contactName}`}
                     limit={chatLimit}
-                    onLoadMore={() => setChatLimit((prev) => prev + 15)}
+                    onLoadMore={() =>
+                      setChatLimitByLead((prev) => ({
+                        ...prev,
+                        [leadId]: (prev[leadId] ?? 15) + 15,
+                      }))
+                    }
                     hasMore={messages.data ? messages.data.length >= chatLimit : true}
                     headerActions={
                       <div className="flex items-center gap-1.5">

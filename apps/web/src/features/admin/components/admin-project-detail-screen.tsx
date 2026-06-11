@@ -53,12 +53,15 @@ import { FileUpload } from "@/components/ui/file-upload";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type {
+  InvoiceStatus,
   MaintenanceLog,
+  ProgressStatus,
   Project,
   ProjectDocument,
   ProjectInvoice,
   ProjectMaintenance,
   ProjectProgress,
+  ProjectStatus,
 } from "@/features/client/types/client.types";
 
 type TabType = "info" | "progress" | "docs" | "maintenance" | "invoice";
@@ -135,7 +138,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
   const [picContact, setPicContact] = React.useState<string | undefined>(undefined);
   const [startDate, setStartDate] = React.useState<string | undefined>(undefined);
   const [targetEndDate, setTargetEndDate] = React.useState<string | undefined>(undefined);
-  const [status, setStatus] = React.useState<string | undefined>(undefined);
+  const [status, setStatus] = React.useState<ProjectStatus | undefined>(undefined);
   const [websiteUrl, setWebsiteUrl] = React.useState<string | undefined>(undefined);
   const [stagingUrl, setStagingUrl] = React.useState<string | undefined>(undefined);
   const [credentials, setCredentials] = React.useState<string | undefined>(undefined);
@@ -143,7 +146,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
 
   // Milestone Form
   const [milestoneTitle, setMilestoneTitle] = React.useState("");
-  const [milestoneStatus, setMilestoneStatus] = React.useState("pending");
+  const [milestoneStatus, setMilestoneStatus] = React.useState<ProgressStatus>("pending");
   const [milestonePercent, setMilestonePercent] = React.useState(0);
   const [milestoneNotes, setMilestoneNotes] = React.useState("");
   const [milestoneDoc, setMilestoneDoc] = React.useState("");
@@ -159,14 +162,14 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
 
   // Maintenance usage log form
   const [logDesc, setLogDesc] = React.useState("");
-  const [logStatus, setLogStatus] = React.useState("pending");
+  const [logStatus, setLogStatus] = React.useState<ProgressStatus>("pending");
   const [logPic, setLogPic] = React.useState("");
   const [selectedMaintLogId, setSelectedMaintLogId] = React.useState("");
 
   // Invoice Form
   const [invNum, setInvNum] = React.useState("");
   const [invAmount, setInvAmount] = React.useState(0);
-  const [invStatus, setInvStatus] = React.useState("draft");
+  const [invStatus, setInvStatus] = React.useState<InvoiceStatus>("draft");
   const [invIssueDate, setInvIssueDate] = React.useState("");
   const [invDueDate, setInvDueDate] = React.useState("");
   const [invDoc, setInvDoc] = React.useState("");
@@ -406,7 +409,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
   };
 
   // Update Invoice Status
-  const handleUpdateInvoiceStatus = (invoiceId: string, nextStatus: string) => {
+  const handleUpdateInvoiceStatus = (invoiceId: string, nextStatus: InvoiceStatus) => {
     updateInvoiceMutation.mutate({
       invoiceId,
       payload: { status: nextStatus },
@@ -580,7 +583,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                         <Select
                           id="info-status"
                           value={status ?? data?.project?.status ?? "discovery"}
-                          onChange={(e) => setStatus(e.target.value)}
+                          onChange={(e) => setStatus(e.target.value as ProjectStatus)}
                         >
                           <option value="discovery">Discovery</option>
                           <option value="planning">Planning</option>
@@ -987,7 +990,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                                 <td className="border-b border-border px-4 py-3">
                                   <select
                                     value={inv.status}
-                                    onChange={(e) => handleUpdateInvoiceStatus(inv.id, e.target.value)}
+                                    onChange={(e) => handleUpdateInvoiceStatus(inv.id, e.target.value as InvoiceStatus)}
                                     className="rounded border border-border bg-background px-2 py-1 text-xs cursor-pointer focus:outline-none"
                                   >
                                     <option value="draft">Draft</option>
@@ -1067,7 +1070,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   <Select
                     id="prog-status"
                     value={milestoneStatus}
-                    onChange={(e) => setMilestoneStatus(e.target.value)}
+                    onChange={(e) => setMilestoneStatus(e.target.value as ProgressStatus)}
                   >
                     <option value="pending">Pending</option>
                     <option value="in_progress">In Progress</option>
@@ -1148,7 +1151,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   <Select
                     id="edit-prog-status"
                     value={milestoneStatus}
-                    onChange={(e) => setMilestoneStatus(e.target.value)}
+                    onChange={(e) => setMilestoneStatus(e.target.value as ProgressStatus)}
                   >
                     <option value="pending">Pending</option>
                     <option value="in_progress">In Progress</option>
@@ -1353,7 +1356,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   <Select
                     id="log-status"
                     value={logStatus}
-                    onChange={(e) => setLogStatus(e.target.value)}
+                    onChange={(e) => setLogStatus(e.target.value as ProgressStatus)}
                   >
                     <option value="pending">Pending</option>
                     <option value="in_progress">In Progress</option>
@@ -1424,7 +1427,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                   <Select
                     id="inv-status"
                     value={invStatus}
-                    onChange={(e) => setInvStatus(e.target.value)}
+                    onChange={(e) => setInvStatus(e.target.value as InvoiceStatus)}
                   >
                     <option value="draft">Draft</option>
                     <option value="sent">Sent</option>

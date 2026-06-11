@@ -7,6 +7,7 @@ import { useAuthGuard } from "@/features/auth/hooks/use-auth";
 import { useAdminPartners, useUpdateUserSuspension } from "../hooks/use-admin";
 import { formatDate } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import type { PartnerWithStats } from "../types/admin.types";
 
 export function PartnerManagementScreen() {
   const auth = useAuthGuard("admin");
@@ -131,7 +132,7 @@ export function PartnerManagementScreen() {
   );
 }
 
-function PartnerRow({ partner }: { partner: any }) {
+function PartnerRow({ partner }: { partner: PartnerWithStats }) {
   const suspension = useUpdateUserSuspension(partner.id);
 
   const handleToggleSuspension = async () => {

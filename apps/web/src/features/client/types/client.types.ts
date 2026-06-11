@@ -99,6 +99,16 @@ export interface AuditLog {
   createdAt: string;
 }
 
+export interface PaginatedNotifications {
+  data: AuditLog[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export type ProjectReportData = Record<string, unknown>;
+
 export interface ClientDashboardData {
   projects: Project[];
   totalProjects: number;
