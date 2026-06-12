@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
-const apiInternalUrl = process.env.API_INTERNAL_URL ?? "http://localhost:8080";
+const apiInternalUrl = process.env.API_INTERNAL_URL ?? "http://localhost:8089";
 
 const nextConfig: NextConfig = {
   typedRoutes: true,
@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
       {
         source: "/api/:path*",
         destination: `${apiInternalUrl}/api/:path*`,
+      },
+      {
+        source: "/uploads/:path*",
+        destination: `${apiInternalUrl}/uploads/:path*`,
       },
     ];
   },

@@ -39,6 +39,11 @@ export async function changePassword(payload: ChangePasswordPayload) {
   return unwrapApiResponse(response.data);
 }
 
+export async function updateLeadEmailNotifications(enabled: boolean) {
+  const response = await apiClient.patch<ApiEnvelope<User>>("/me/lead-email-notifications", { enabled });
+  return unwrapApiResponse(response.data);
+}
+
 export async function confirmPasswordReset(payload: PasswordResetConfirmPayload) {
   const response = await apiClient.post<ApiEnvelope<Record<string, never>>>("/auth/password-reset/confirm", payload);
   return unwrapApiResponse(response.data);

@@ -1,12 +1,14 @@
-export type Role = "super_admin" | "admin" | "partner";
-export type ScopeRole = "admin" | "partner";
+export type Role = "super_admin" | "admin" | "partner" | "client";
+export type ScopeRole = "admin" | "partner" | "client";
 
 export function isAdminRole(role: Role): boolean {
   return role === "admin" || role === "super_admin";
 }
 
 export function rolePath(role: Role): ScopeRole {
-  return isAdminRole(role) ? "admin" : "partner";
+  if (isAdminRole(role)) return "admin";
+  if (role === "client") return "client";
+  return "partner";
 }
 
 export type User = {
@@ -16,6 +18,7 @@ export type User = {
   email: string;
   role: Role;
   partnerCode: string;
+  leadEmailNotificationsEnabled: boolean;
   isSuspended: boolean;
   suspendedReason: string;
   createdAt: string;

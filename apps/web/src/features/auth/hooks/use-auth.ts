@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale } from "next-intl";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -25,6 +25,7 @@ import {
   registerPartner,
   requestCurrentUserPasswordReset,
   requestPasswordReset,
+  updateLeadEmailNotifications,
 } from "../services/auth.service";
 import { isAdminRole, rolePath, type Role } from "../types/auth.types";
 import { clearAccessToken, getAccessToken, setAccessToken } from "../utils/auth-storage";
@@ -150,6 +151,17 @@ export function usePasswordResetRequestForm(initialEmail = "") {
 export function useCurrentUserPasswordReset() {
   return useMutation({
     mutationFn: requestCurrentUserPasswordReset,
+  });
+}
+
+export function useLeadEmailNotificationPreference() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: updateLeadEmailNotifications,
+    onSuccess: (user) => {
+      queryClient.setQueryData(["auth", "me"], user);
+    },
   });
 }
 

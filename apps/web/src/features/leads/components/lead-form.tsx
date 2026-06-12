@@ -11,10 +11,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { useServiceCatalog } from "@/features/services/hooks/use-services";
 import { useCreateLeadForm } from "../hooks/use-leads";
 import { formatCurrency } from "@/lib/utils";
+import { useToastStore } from "@/features/dashboard/stores/use-toast-store";
 
-export function LeadForm() {
+type LeadFormProps = {
+  onSuccess?: () => void;
+  onCancel?: () => void;
+};
+
+export function LeadForm({ onSuccess, onCancel }: LeadFormProps) {
   const services = useServiceCatalog();
-  const { form, isLoading, errorMessage, successMessage, onSubmit } = useCreateLeadForm();
+  const addToast = useToastStore((state) => state.addToast);
+  const { form, isLoading, errorMessage, onSubmit } = useCreateLeadForm({
+    onSuccess: () => {
+      addToast("Lead berhasil dikirim dan otomatis masuk pipeline kualifikasi", "success");
+      onSuccess?.();
+    },
+  });
   const {
     register,
     watch,
@@ -24,7 +36,7 @@ export function LeadForm() {
   const selectedService = services.data?.find((service) => service.type === watch("serviceType"));
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5 rounded-lg border border-border bg-card p-5">
+    <form onSubmit={onSubmit} className="space-y-5 p-6">
       <div>
         <h2 className="text-xl font-extrabold text-foreground">Submit lead baru</h2>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -40,7 +52,7 @@ export function LeadForm() {
           </Field>
           <Field>
             <FieldLabel htmlFor="serviceType">Layanan</FieldLabel>
-            <Select id="serviceType" {...register("serviceType")}>
+            <Select id="serviceType" {...register("serviceType")} className="cursor-pointer">
               {services.data?.map((service) => (
                 <option key={service.type} value={service.type}>
                   {service.label}
@@ -100,11 +112,17 @@ export function LeadForm() {
         </Field>
       </FieldGroup>
       {errorMessage ? <FieldError>{errorMessage}</FieldError> : null}
-      {successMessage ? <p className="text-sm font-semibold text-success">{successMessage}</p> : null}
-      <Button type="submit" isLoading={isLoading}>
-        <Send className="h-4 w-4" aria-hidden="true" />
-        Kirim lead
-      </Button>
+      <div className="flex justify-end gap-2 pt-2">
+        {onCancel ? (
+          <Button type="button" variant="secondary" onClick={onCancel} className="cursor-pointer">
+            Batal
+          </Button>
+        ) : null}
+        <Button type="submit" isLoading={isLoading} className="cursor-pointer">
+          <Send className="h-4 w-4" aria-hidden="true" />
+          Kirim lead
+        </Button>
+      </div>
     </form>
   );
 }

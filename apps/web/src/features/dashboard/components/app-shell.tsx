@@ -2,11 +2,11 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Download, KeyRound, LogOut, Smartphone } from "lucide-react";
+import { Bell, Download, KeyRound, LogOut, Smartphone } from "lucide-react";
 import { Link, usePathname } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
-import { useLogout } from "@/features/auth/hooks/use-auth";
-import { isAdminRole, rolePath, type User } from "@/features/auth/types/auth.types";
+import { useLeadEmailNotificationPreference, useLogout } from "@/features/auth/hooks/use-auth";
+import { isAdminRole, type User } from "@/features/auth/types/auth.types";
 import { useUnreadCount } from "@/features/leads/hooks/use-leads";
 
 type NavItem = {
@@ -31,26 +31,42 @@ const partnerNav: NavItem[] = [
 const adminNav: NavItem[] = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/leads", label: "Lead" },
+  { href: "/admin/clients", label: "Klien" },
   { href: "/admin/chat", label: "Chat" },
   { href: "/admin/services", label: "Layanan" },
   { href: "/admin/partners", label: "Mitra" },
   { href: "/admin/admins", label: "Admin", superAdminOnly: true },
 ];
 
+const clientNav: NavItem[] = [
+  { href: "/client", label: "Dashboard" },
+  { href: "/client/projects", label: "Project" },
+];
+
 export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>) {
   const pathname = usePathname();
   const logout = useLogout();
   const adminScope = isAdminRole(user.role);
+  const leadEmailPreference = useLeadEmailNotificationPreference();
   const items = adminScope
     ? adminNav.filter((item) => !item.superAdminOnly || user.role === "super_admin")
+    : user.role === "client"
+    ? clientNav
     : partnerNav;
-  const unreadQuery = useUnreadCount(rolePath(user.role));
+  const unreadQuery = useUnreadCount(adminScope ? "admin" : "partner", user.role !== "client");
   const mobileDownloadUrl = process.env.NEXT_PUBLIC_MOBILE_APP_DOWNLOAD_URL;
 
   const [profileOpen, setProfileOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
-  const totalUnread = unreadQuery.data?.data?.reduce((acc, lead) => acc + lead.unreadCount, 0) ?? 0;
+  const totalUnread = user.role !== "client"
+    ? (unreadQuery.data?.data?.reduce((acc, lead) => acc + lead.unreadCount, 0) ?? 0)
+    : 0;
+
+  const handleLeadNotificationToggle = React.useCallback(() => {
+    if (!adminScope || leadEmailPreference.isPending) return;
+    leadEmailPreference.mutate(!user.leadEmailNotificationsEnabled);
+  }, [adminScope, leadEmailPreference, user.leadEmailNotificationsEnabled]);
 
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -135,7 +151,7 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
                 <div className="hidden md:flex flex-col text-left">
                   <span className="text-xs font-bold text-foreground leading-none">{user.name}</span>
                   <span className="text-[10px] text-muted-foreground mt-1">
-                    {adminScope ? (user.role === "super_admin" ? "Super Admin" : "Admin") : user.partnerCode}
+                    {adminScope ? (user.role === "super_admin" ? "Super Admin" : "Admin") : user.role === "client" ? "Klien" : user.partnerCode}
                   </span>
                 </div>
               </button>
@@ -147,16 +163,58 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
                     <div className="text-xs font-bold text-foreground leading-none">{user.name}</div>
                     <div className="text-[10px] text-muted-foreground mt-1 truncate">{user.email}</div>
                     <div className="mt-1.5 text-[9px] font-semibold text-primary uppercase tracking-wider">
-                      {adminScope ? (user.role === "super_admin" ? "Console Super Admin" : "Console Admin") : `Mitra Code: ${user.partnerCode}`}
+                      {adminScope ? (user.role === "super_admin" ? "Console Super Admin" : "Console Admin") : user.role === "client" ? "Portal Klien" : `Mitra Code: ${user.partnerCode}`}
                     </div>
                   </div>
                   <div className="my-1 border-t border-border/60" />
+                  {adminScope && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleLeadNotificationToggle}
+                        disabled={leadEmailPreference.isPending}
+                        className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        <div className="mt-0.5 rounded-md border border-border/70 bg-secondary/60 p-1.5 text-foreground">
+                          <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-foreground">Notif email lead baru</span>
+                            <span
+                              className={cn(
+                                "inline-flex h-5 w-9 items-center rounded-full border transition-colors",
+                                user.leadEmailNotificationsEnabled
+                                  ? "border-primary/40 bg-primary/20 justify-end"
+                                  : "border-border bg-secondary/80 justify-start",
+                              )}
+                              aria-hidden="true"
+                            >
+                              <span className="mx-0.5 h-3.5 w-3.5 rounded-full bg-foreground/90" />
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                            Jika dimatikan, server akan skip email lead baru ke alamat ini sebelum request ke Resend.
+                          </p>
+                          {leadEmailPreference.isPending ? (
+                            <p className="mt-1 text-[10px] font-semibold text-primary">Menyimpan...</p>
+                          ) : null}
+                          {leadEmailPreference.error instanceof Error ? (
+                            <p className="mt-1 text-[10px] font-semibold text-destructive">
+                              {leadEmailPreference.error.message}
+                            </p>
+                          ) : null}
+                        </div>
+                      </button>
+                      <div className="my-1 border-t border-border/60" />
+                    </>
+                  )}
                   <Link
-                    href="/change-password"
+                    href={user.role === "client" ? "/client/settings" : "/change-password"}
                     className="w-full text-left flex items-center gap-2 px-3 py-2 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md cursor-pointer transition-colors"
                   >
                     <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
-                    Ubah password
+                    {user.role === "client" ? "Pengaturan Akun" : "Ubah password"}
                   </Link>
                   <button
                     type="button"

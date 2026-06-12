@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Send, MessageCircle, Building2 } from "lucide-react";
+import { Send, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLeadMessages, useSendMessage } from "../hooks/use-leads";
 import { formatDate } from "@/lib/utils";
@@ -38,9 +38,8 @@ export function LeadChat({
   const bottomRef = React.useRef<HTMLDivElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const lastMsgIdRef = React.useRef<string | null>(null);
-
-  const [prevScrollHeight, setPrevScrollHeight] = React.useState<number>(0);
-  const [prevScrollTop, setPrevScrollTop] = React.useState<number>(0);
+  const prevScrollHeightRef = React.useRef(0);
+  const prevScrollTopRef = React.useRef(0);
 
   // Scroll to bottom or keep scroll position on load
   React.useEffect(() => {
@@ -64,13 +63,14 @@ export function LeadChat({
     const container = containerRef.current;
     if (!container) return;
 
-    if (prevScrollHeight > 0) {
+    if (prevScrollHeightRef.current > 0) {
       const newScrollHeight = container.scrollHeight;
-      const heightDifference = newScrollHeight - prevScrollHeight;
-      container.scrollTop = prevScrollTop + heightDifference;
-      setPrevScrollHeight(0);
+      const heightDifference = newScrollHeight - prevScrollHeightRef.current;
+      container.scrollTop = prevScrollTopRef.current + heightDifference;
+      prevScrollHeightRef.current = 0;
+      prevScrollTopRef.current = 0;
     }
-  }, [messages.data, prevScrollHeight, prevScrollTop]);
+  }, [messages.data]);
 
   const handleScroll = () => {
     const container = containerRef.current;
@@ -78,8 +78,8 @@ export function LeadChat({
 
     // When scrolled to top, trigger load more if there's more to load
     if (container.scrollTop === 0 && hasMore && !messages.isFetching) {
-      setPrevScrollHeight(container.scrollHeight);
-      setPrevScrollTop(container.scrollTop);
+      prevScrollHeightRef.current = container.scrollHeight;
+      prevScrollTopRef.current = container.scrollTop;
       onLoadMore();
     }
   };
@@ -213,4 +213,3 @@ export function LeadChat({
     </div>
   );
 }
-

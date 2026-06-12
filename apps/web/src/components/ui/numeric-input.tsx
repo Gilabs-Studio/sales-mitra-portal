@@ -39,14 +39,15 @@ export const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(true);
+      const input = e.currentTarget;
       // Select all text on focus
-      requestAnimationFrame(() => e.currentTarget.select());
+      requestAnimationFrame(() => input.select());
       onFocus?.(e);
     };
 
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(false);
-      const parsed = parseFloat(rawInput.replace(/[^\d.-]/g, ""));
+      const parsed = parseInt(rawInput.replace(/[^\d]/g, ""), 10);
       const finalValue = isNaN(parsed) ? 0 : parsed;
       setRawInput(String(finalValue));
       onChange?.(finalValue);
@@ -54,14 +55,13 @@ export const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const raw = e.target.value;
-      // Allow only digits, one dot, one leading minus
-      if (/^-?\d*\.?\d*$/.test(raw) || raw === "") {
-        setRawInput(raw);
-        const parsed = parseFloat(raw);
-        if (!isNaN(parsed)) {
-          onChange?.(parsed);
-        }
+      const digitsOnly = e.target.value.replace(/[^\d]/g, "");
+      setRawInput(digitsOnly);
+      if (digitsOnly === "") return;
+
+      const parsed = parseInt(digitsOnly, 10);
+      if (!isNaN(parsed)) {
+        onChange?.(parsed);
       }
     };
 
@@ -71,17 +71,21 @@ export const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps
         "ArrowLeft", "ArrowRight", "Home", "End",
       ];
       const key = e.key;
-      const value = e.currentTarget.value;
       const isDigit = /^[0-9]$/.test(key);
-      const isDecimal = key === "." && !value.includes(".");
-      if (!allowed.includes(key) && !isDigit && !isDecimal) {
+      if (!allowed.includes(key) && !isDigit) {
         e.preventDefault();
       }
     };
 
     return (
       <input
-        ref={ref}
+        ref={(node) => {
+          if (typeof ref === "function") {
+            ref(node);
+          } else if (ref) {
+            ref.current = node;
+          }
+        }}
         type="text"
         inputMode="numeric"
         className={cn(

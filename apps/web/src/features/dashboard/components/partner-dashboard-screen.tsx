@@ -1,17 +1,20 @@
 "use client";
 
-import { Plus, Send } from "lucide-react";
-import { Link } from "@/i18n/routing";
+import { Plus } from "lucide-react";
 import { AppShell } from "./app-shell";
 import { BreakdownGrid, MetricGrid } from "./metric-grid";
 import { ReferralList } from "./referral-list";
 import { useAuthGuard } from "@/features/auth/hooks/use-auth";
 import { LeadTable } from "@/features/leads/components/lead-table";
 import { usePartnerDashboard } from "../hooks/use-dashboard";
+import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
+import { LeadForm } from "@/features/leads/components/lead-form";
+import { useLeadModalStore } from "@/features/leads/stores/use-lead-modal-store";
 
 export function PartnerDashboardScreen() {
   const auth = useAuthGuard("partner");
   const dashboard = usePartnerDashboard();
+  const modal = useLeadModalStore();
 
   if (auth.isLoading || !auth.isAllowed || !auth.user) {
     return <div className="min-h-screen bg-background" />;
@@ -29,20 +32,13 @@ export function PartnerDashboardScreen() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
-              href="/partner/leads"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0"
+            <button
+              onClick={modal.open}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-extrabold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0 cursor-pointer shadow"
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
               Submit lead
-            </Link>
-            <Link
-              href="/partner/leads"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2 text-sm font-semibold text-foreground transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0"
-            >
-              <Send className="h-4 w-4" aria-hidden="true" />
-              Quick action
-            </Link>
+            </button>
           </div>
         </section>
         {dashboard.isError ? <p className="text-sm font-semibold text-destructive">Dashboard gagal dimuat</p> : null}
@@ -59,6 +55,13 @@ export function PartnerDashboardScreen() {
           <ReferralList referrals={dashboard.data?.referrals ?? []} />
         </div>
       </div>
+
+      <Dialog open={modal.isOpen} onOpenChange={(open) => (open ? modal.open() : modal.close())}>
+        <DialogOverlay />
+        <DialogContent className="max-w-2xl p-0 overflow-hidden">
+          <LeadForm onSuccess={modal.close} onCancel={modal.close} />
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -14,17 +15,61 @@ import (
 	"github.com/gilabs/mitra-sales-portal/apps/api/internal/store"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const currentUserKey = "currentUser"
 
 type Handler struct {
+	cfg              config.Config
 	store            *store.Store
 	authService      *service.AuthService
 	leadService      *service.LeadService
 	knowledgeService *service.KnowledgeService
 	catalogService   *service.ServiceCatalogService
 	uploadService    *service.UploadService
+	clientService    *service.ClientProjectService
+}
+
+func (h Handler) normalizeAssetURL(raw string) string {
+	if raw == "" || h.cfg.R2PublicURL == "" {
+		return raw
+	}
+
+	base, err := url.Parse(strings.TrimRight(h.cfg.R2PublicURL, "/"))
+	if err != nil {
+		return raw
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" || !strings.HasSuffix(parsed.Host, ".r2.dev") {
+		return raw
+	}
+
+	parsed.Scheme = base.Scheme
+	parsed.Host = base.Host
+	return parsed.String()
+}
+
+func (h Handler) normalizeProjectProgress(progress []domain.ProjectProgress) []domain.ProjectProgress {
+	for i := range progress {
+		progress[i].DocumentURL = h.normalizeAssetURL(progress[i].DocumentURL)
+	}
+	return progress
+}
+
+func (h Handler) normalizeProjectDocuments(docs []domain.ProjectDocument) []domain.ProjectDocument {
+	for i := range docs {
+		docs[i].DocumentURL = h.normalizeAssetURL(docs[i].DocumentURL)
+	}
+	return docs
+}
+
+func (h Handler) normalizeProjectInvoices(invoices []domain.ProjectInvoice) []domain.ProjectInvoice {
+	for i := range invoices {
+		invoices[i].DocumentURL = h.normalizeAssetURL(invoices[i].DocumentURL)
+	}
+	return invoices
 }
 
 func NewRouter(
@@ -34,6 +79,7 @@ func NewRouter(
 	leadService *service.LeadService,
 	knowledgeService *service.KnowledgeService,
 	catalogService *service.ServiceCatalogService,
+	clientService *service.ClientProjectService,
 ) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
@@ -57,12 +103,14 @@ func NewRouter(
 	}))
 
 	handler := Handler{
+		cfg:              cfg,
 		store:            repository,
 		authService:      authService,
 		leadService:      leadService,
 		knowledgeService: knowledgeService,
 		catalogService:   catalogService,
 		uploadService:    service.NewUploadService(cfg),
+		clientService:    clientService,
 	}
 
 	api := router.Group("/api/v1")
@@ -78,6 +126,7 @@ func NewRouter(
 	protected.GET("/me", handler.me)
 	protected.POST("/me/password-change", handler.changePassword)
 	protected.POST("/me/password-reset", handler.requestCurrentUserPasswordReset)
+	protected.PATCH("/me/lead-email-notifications", handler.updateLeadEmailNotifications)
 	protected.GET("/knowledge", handler.knowledge)
 	protected.POST("/chatbot/ask", handler.askChatbot)
 
@@ -113,8 +162,54 @@ func NewRouter(
 	admin.POST("/leads/:id/payouts", handler.createPayout)
 	admin.GET("/leads/:id/payouts", handler.getPayouts)
 	admin.PATCH("/users/:id/suspension", handler.updateUserSuspension)
+	admin.POST("/upload", handler.adminUploadFile)
 	admin.GET("/admins", requireRole(domain.RoleSuperAdmin), handler.listAdmins)
 	admin.POST("/admins", requireRole(domain.RoleSuperAdmin), handler.createAdmin)
+
+	// Client Management
+	admin.GET("/clients", handler.adminClients)
+	admin.POST("/clients", handler.adminCreateClient)
+	admin.GET("/clients/:id", handler.adminClientDetail)
+	admin.DELETE("/clients/:id", handler.adminDeleteClient)
+	admin.POST("/clients/:id/reset-password", handler.adminResetClientPassword)
+
+	// Project Management
+	admin.GET("/projects", handler.adminProjects)
+	admin.POST("/projects", handler.adminCreateProject)
+	admin.GET("/projects/:id", handler.adminProjectDetail)
+	admin.PATCH("/projects/:id", handler.adminUpdateProject)
+	admin.DELETE("/projects/:id", handler.adminDeleteProject)
+	admin.POST("/projects/:id/progress", handler.adminCreateProgress)
+	admin.PATCH("/projects/:id/progress/:progressId", handler.adminUpdateProgress)
+	admin.DELETE("/projects/:id/progress/:progressId", handler.adminDeleteProgress)
+	admin.POST("/projects/:id/documents", handler.adminCreateDocument)
+	admin.DELETE("/projects/:id/documents/:docId", handler.adminDeleteDocument)
+	admin.POST("/projects/:id/maintenance", handler.adminCreateMaintenance)
+	admin.PATCH("/projects/:id/maintenance/:maintId", handler.adminUpdateMaintenance)
+	admin.DELETE("/projects/:id/maintenance/:maintId", handler.adminDeleteMaintenance)
+	admin.POST("/projects/:id/maintenance-logs", handler.adminCreateMaintenanceLog)
+	admin.DELETE("/projects/:id/maintenance-logs/:logId", handler.adminDeleteMaintenanceLog)
+	admin.GET("/maintenance-logs", handler.adminAllMaintenanceLogs)
+	admin.PATCH("/maintenance-logs/:logId/status", handler.adminUpdateMaintenanceLogStatus)
+	admin.POST("/projects/:id/invoices", handler.adminCreateInvoice)
+	admin.PATCH("/projects/:id/invoices/:invoiceId", handler.adminUpdateInvoice)
+	admin.DELETE("/projects/:id/invoices/:invoiceId", handler.adminDeleteInvoice)
+
+	// Client Portal routes
+	client := protected.Group("/client")
+	client.Use(requireRole(domain.RoleClient))
+	client.GET("/dashboard", handler.clientDashboard)
+	client.GET("/projects", handler.clientProjects)
+	client.GET("/projects/:id", handler.clientProjectDetail)
+	client.GET("/projects/:id/progress", handler.clientProjectProgress)
+	client.GET("/projects/:id/maintenance", handler.clientProjectMaintenance)
+	client.GET("/projects/:id/maintenance-logs", handler.clientProjectMaintenanceLogs)
+	client.POST("/projects/:id/maintenance-requests", handler.clientCreateMaintenanceRequest)
+	client.GET("/projects/:id/invoices", handler.clientProjectInvoices)
+	client.GET("/projects/:id/documents", handler.clientProjectDocuments)
+	client.GET("/projects/:id/reports", handler.clientProjectReports)
+	client.GET("/notifications", handler.clientNotifications)
+	client.PATCH("/profile", handler.updateClientProfile)
 
 	router.Static("/uploads", "./data/uploads")
 
@@ -256,6 +351,25 @@ func (h Handler) changePassword(c *gin.Context) {
 	}
 
 	httpx.OK(c, "Password berhasil diperbarui", gin.H{})
+}
+
+func (h Handler) updateLeadEmailNotifications(c *gin.Context) {
+	var input struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload pengaturan notifikasi tidak valid", err.Error()))
+		return
+	}
+
+	user, err := h.authService.UpdateLeadEmailNotificationsEnabled(c.Request.Context(), currentUser(c).ID, input.Enabled)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	c.Set(currentUserKey, user)
+	httpx.OK(c, "Pengaturan notifikasi lead berhasil diperbarui", user)
 }
 
 func (h Handler) serviceCatalog(c *gin.Context) {
@@ -407,7 +521,7 @@ func (h Handler) updateLeadStatus(c *gin.Context) {
 
 func (h Handler) adminPartners(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
-	if pageSize <= 0 || pageSize > 100 {
+	if pageSize <= 0 || pageSize > 20 {
 		pageSize = 20
 	}
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -665,7 +779,7 @@ func bearerToken(header string) string {
 
 func leadFilters(c *gin.Context) store.LeadFilters {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
-	if pageSize <= 0 || pageSize > 100 {
+	if pageSize <= 0 || pageSize > 20 {
 		pageSize = 20
 	}
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -676,6 +790,9 @@ func leadFilters(c *gin.Context) store.LeadFilters {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	if limit > 0 {
 		pageSize = limit
+		if pageSize > 20 {
+			pageSize = 20
+		}
 	}
 	return store.LeadFilters{
 		Status:      strings.TrimSpace(c.Query("status")),
@@ -689,8 +806,8 @@ func normalizePageSize(limit int) int {
 	if limit <= 0 {
 		return 20
 	}
-	if limit > 100 {
-		return 100
+	if limit > 20 {
+		return 20
 	}
 	return limit
 }
@@ -771,7 +888,11 @@ func (h Handler) createPayout(c *gin.Context) {
 		return
 	}
 
-	evidenceURL, err := h.uploadService.UploadEvidence(c.Request.Context(), file)
+	evidenceURL, err := h.uploadService.UploadEvidence(c.Request.Context(), file, service.UploadPathOptions{
+		ClientID: lead.PartnerID,
+		ProjectID: leadID,
+		Category: "payouts",
+	})
 	if err != nil {
 		httpx.Fail(c, httpx.Validation("Gagal mengunggah bukti bayar", err.Error()))
 		return
@@ -820,5 +941,755 @@ func (h Handler) getPayouts(c *gin.Context) {
 	httpx.OK(c, "Daftar payout", gin.H{
 		"payouts": payouts,
 		"summary": summary,
+	})
+}
+
+// Client Management Handlers
+func (h Handler) adminClients(c *gin.Context) {
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 20
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+
+	limit := pageSize
+	offset := (page - 1) * pageSize
+
+	clients, total, err := h.store.ListClients(c.Request.Context(), limit, offset)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Daftar klien", gin.H{
+		"data":       clients,
+		"total":      total,
+		"page":       page,
+		"pageSize":   pageSize,
+		"totalPages": ceilDiv(int(total), pageSize),
+	})
+}
+
+func (h Handler) adminCreateClient(c *gin.Context) {
+	var input struct {
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload klien tidak valid", err.Error()))
+		return
+	}
+
+	user, err := h.authService.CreateClient(c.Request.Context(), input.Name, input.Email, input.Password)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.Created(c, "Klien berhasil dibuat", user)
+}
+
+func (h Handler) adminClientDetail(c *gin.Context) {
+	id := c.Param("id")
+	client, err := h.store.GetUserByID(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	projects, err := h.store.ListProjects(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Detail klien", gin.H{
+		"client":   client,
+		"projects": projects,
+	})
+}
+
+func (h Handler) adminDeleteClient(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.store.DeleteClient(c.Request.Context(), id); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			httpx.Fail(c, httpx.NotFound("Klien tidak ditemukan"))
+			return
+		}
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Klien berhasil dihapus", gin.H{})
+}
+
+func (h Handler) adminResetClientPassword(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.authService.RequestPasswordResetForUser(c.Request.Context(), id); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Reset password berhasil dipicu", gin.H{})
+}
+
+// Project Management Handlers
+func (h Handler) adminProjects(c *gin.Context) {
+	projects, err := h.store.ListProjects(c.Request.Context(), "")
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Daftar project", projects)
+}
+
+func (h Handler) adminCreateProject(c *gin.Context) {
+	var input domain.Project
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload project tidak valid", err.Error()))
+		return
+	}
+
+	project, err := h.clientService.CreateProject(c.Request.Context(), input)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.Created(c, "Project berhasil dibuat", project)
+}
+
+func (h Handler) adminProjectDetail(c *gin.Context) {
+	id := c.Param("id")
+	project, err := h.store.GetProjectByID(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	progress, _ := h.store.ListProjectProgress(c.Request.Context(), id)
+	docs, _ := h.store.ListProjectDocuments(c.Request.Context(), id)
+	maintList, _ := h.store.ListProjectMaintenance(c.Request.Context(), id)
+	maintLogs, _ := h.store.ListMaintenanceLogs(c.Request.Context(), id)
+	invoices, _ := h.store.ListProjectInvoices(c.Request.Context(), id)
+	auditLogs, _ := h.store.ListAuditLogs(c.Request.Context(), id)
+
+	httpx.OK(c, "Detail project", gin.H{
+		"project":     project,
+		"progress":    h.normalizeProjectProgress(progress),
+		"documents":   h.normalizeProjectDocuments(docs),
+		"maintenance": maintList,
+		"maintLogs":   maintLogs,
+		"invoices":    h.normalizeProjectInvoices(invoices),
+		"auditLogs":   auditLogs,
+	})
+}
+
+func (h Handler) adminUpdateProject(c *gin.Context) {
+	id := c.Param("id")
+	var input domain.Project
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload update project tidak valid", err.Error()))
+		return
+	}
+
+	project, err := h.clientService.UpdateProject(c.Request.Context(), id, input)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Project berhasil diperbarui", project)
+}
+
+func (h Handler) adminDeleteProject(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.store.DeleteProject(c.Request.Context(), id); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Project berhasil dihapus", gin.H{})
+}
+
+func (h Handler) adminCreateProgress(c *gin.Context) {
+	id := c.Param("id")
+	var input domain.ProjectProgress
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload progress tidak valid", err.Error()))
+		return
+	}
+
+	progress, err := h.clientService.CreateProgress(c.Request.Context(), id, input)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.Created(c, "Progress berhasil ditambahkan", progress)
+}
+
+func (h Handler) adminUpdateProgress(c *gin.Context) {
+	id := c.Param("id")
+	progressId := c.Param("progressId")
+	var input domain.ProjectProgress
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload progress tidak valid", err.Error()))
+		return
+	}
+
+	progress, err := h.clientService.UpdateProgress(c.Request.Context(), id, progressId, input)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Progress berhasil diperbarui", progress)
+}
+
+func (h Handler) adminDeleteProgress(c *gin.Context) {
+	progressId := c.Param("progressId")
+	if err := h.store.DeleteProjectProgress(c.Request.Context(), progressId); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Progress berhasil dihapus", gin.H{})
+}
+
+func (h Handler) adminCreateDocument(c *gin.Context) {
+	id := c.Param("id")
+	var input domain.ProjectDocument
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload document tidak valid", err.Error()))
+		return
+	}
+
+	doc, err := h.clientService.CreateDocument(c.Request.Context(), id, input)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.Created(c, "Dokumen berhasil diunggah", doc)
+}
+
+func (h Handler) adminDeleteDocument(c *gin.Context) {
+	docId := c.Param("docId")
+	if err := h.store.DeleteProjectDocument(c.Request.Context(), docId); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Dokumen berhasil dihapus", gin.H{})
+}
+
+func (h Handler) adminCreateMaintenance(c *gin.Context) {
+	id := c.Param("id")
+	var input domain.ProjectMaintenance
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload maintenance tidak valid", err.Error()))
+		return
+	}
+	input.ProjectID = id
+
+	maint, err := h.clientService.CreateMaintenance(c.Request.Context(), input)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.Created(c, "Maintenance berhasil disimpan", maint)
+}
+
+func (h Handler) adminUpdateMaintenance(c *gin.Context) {
+	maintId := c.Param("maintId")
+	var input domain.ProjectMaintenance
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload maintenance tidak valid", err.Error()))
+		return
+	}
+
+	maint, err := h.clientService.UpdateMaintenance(c.Request.Context(), maintId, input)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Maintenance berhasil diperbarui", maint)
+}
+
+func (h Handler) adminDeleteMaintenance(c *gin.Context) {
+	maintId := c.Param("maintId")
+	if err := h.clientService.DeleteMaintenance(c.Request.Context(), maintId); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Maintenance berhasil dihapus", gin.H{})
+}
+
+func (h Handler) adminCreateMaintenanceLog(c *gin.Context) {
+	id := c.Param("id")
+	var input struct {
+		Description   string `json:"description"`
+		Status        string `json:"status"`
+		PICName       string `json:"picName"`
+		MaintenanceID string `json:"maintenanceId"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload log maintenance tidak valid", err.Error()))
+		return
+	}
+
+	if input.MaintenanceID == "" {
+		httpx.Fail(c, httpx.Validation("Pilih paket maintenance yang ingin dicatat", ""))
+		return
+	}
+
+	log, err := h.clientService.CreateMaintenanceLog(c.Request.Context(), id, domain.MaintenanceLog{
+		Description: input.Description,
+		Status:      domain.ProgressStatus(input.Status),
+		PICName:     input.PICName,
+	}, input.MaintenanceID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.Created(c, "Penggunaan maintenance berhasil dicatat", log)
+}
+
+func (h Handler) adminDeleteMaintenanceLog(c *gin.Context) {
+	logId := c.Param("logId")
+	if err := h.store.DeleteMaintenanceLog(c.Request.Context(), logId); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Log maintenance berhasil dihapus", gin.H{})
+}
+
+func (h Handler) adminCreateInvoice(c *gin.Context) {
+	id := c.Param("id")
+	var input domain.ProjectInvoice
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload invoice tidak valid", err.Error()))
+		return
+	}
+
+	invoice, err := h.clientService.CreateInvoice(c.Request.Context(), id, input)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.Created(c, "Invoice berhasil dibuat", invoice)
+}
+
+func (h Handler) adminUpdateInvoice(c *gin.Context) {
+	invoiceId := c.Param("invoiceId")
+	var input domain.ProjectInvoice
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload update invoice tidak valid", err.Error()))
+		return
+	}
+
+	invoice, err := h.clientService.UpdateInvoice(c.Request.Context(), invoiceId, input)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Invoice berhasil diperbarui", invoice)
+}
+
+func (h Handler) adminDeleteInvoice(c *gin.Context) {
+	invoiceId := c.Param("invoiceId")
+	if err := h.store.DeleteProjectInvoice(c.Request.Context(), invoiceId); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Invoice berhasil dihapus", gin.H{})
+}
+
+// Client Portal Handlers
+func (h Handler) clientDashboard(c *gin.Context) {
+	user := currentUser(c)
+	projects, err := h.store.ListProjects(c.Request.Context(), user.ID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	var activeProjectsCount int
+	for _, p := range projects {
+		if p.Status != domain.ProjectStatusCompleted {
+			activeProjectsCount++
+		}
+	}
+
+	// Single call replaces N*3 per-project queries
+	stats, err := h.store.GetClientDashboardStats(c.Request.Context(), user.ID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Dashboard klien", gin.H{
+		"projects":             projects,
+		"totalProjects":        len(projects),
+		"activeProjects":       activeProjectsCount,
+		"unpaidInvoicesCount":  stats.UnpaidInvoicesCount,
+		"unpaidInvoicesAmount": stats.UnpaidInvoicesAmount,
+		"maintenance":          stats.Maintenance,
+		"notifications":        stats.RecentActivity,
+	})
+}
+
+
+func (h Handler) clientProjects(c *gin.Context) {
+	user := currentUser(c)
+	projects, err := h.store.ListProjects(c.Request.Context(), user.ID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Daftar project", projects)
+}
+
+func (h Handler) clientProjectDetail(c *gin.Context) {
+	id := c.Param("id")
+	user := currentUser(c)
+	project, err := h.store.GetProjectByID(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	if project.ClientID != user.ID {
+		httpx.Fail(c, httpx.Forbidden("Akses ditolak"))
+		return
+	}
+
+	httpx.OK(c, "Detail project klien", project)
+}
+
+func (h Handler) clientProjectProgress(c *gin.Context) {
+	id := c.Param("id")
+	user := currentUser(c)
+	project, err := h.store.GetProjectByID(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if project.ClientID != user.ID {
+		httpx.Fail(c, httpx.Forbidden("Akses ditolak"))
+		return
+	}
+
+	progress, err := h.store.ListProjectProgress(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Progres project", h.normalizeProjectProgress(progress))
+}
+
+func (h Handler) clientProjectMaintenance(c *gin.Context) {
+	id := c.Param("id")
+	user := currentUser(c)
+	project, err := h.store.GetProjectByID(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if project.ClientID != user.ID {
+		httpx.Fail(c, httpx.Forbidden("Akses ditolak"))
+		return
+	}
+
+	maint, err := h.store.ListProjectMaintenance(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Maintenance project", maint)
+}
+
+func (h Handler) clientProjectMaintenanceLogs(c *gin.Context) {
+	id := c.Param("id")
+	user := currentUser(c)
+	project, err := h.store.GetProjectByID(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if project.ClientID != user.ID {
+		httpx.Fail(c, httpx.Forbidden("Akses ditolak"))
+		return
+	}
+
+	logs, err := h.store.ListMaintenanceLogs(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Log maintenance project", logs)
+}
+
+func (h Handler) clientProjectInvoices(c *gin.Context) {
+	id := c.Param("id")
+	user := currentUser(c)
+	project, err := h.store.GetProjectByID(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if project.ClientID != user.ID {
+		httpx.Fail(c, httpx.Forbidden("Akses ditolak"))
+		return
+	}
+
+	invoices, err := h.store.ListProjectInvoices(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	// Filter out draft invoices for clients
+	clientInvoices := []domain.ProjectInvoice{}
+	for _, inv := range invoices {
+		if inv.Status != domain.InvoiceStatusDraft {
+			clientInvoices = append(clientInvoices, inv)
+		}
+	}
+
+	httpx.OK(c, "Invoice project", h.normalizeProjectInvoices(clientInvoices))
+}
+
+func (h Handler) clientProjectDocuments(c *gin.Context) {
+	id := c.Param("id")
+	user := currentUser(c)
+	project, err := h.store.GetProjectByID(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if project.ClientID != user.ID {
+		httpx.Fail(c, httpx.Forbidden("Akses ditolak"))
+		return
+	}
+
+	docs, err := h.store.ListProjectDocuments(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Dokumen project", h.normalizeProjectDocuments(docs))
+}
+
+func (h Handler) clientProjectReports(c *gin.Context) {
+	id := c.Param("id")
+	user := currentUser(c)
+	project, err := h.store.GetProjectByID(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if project.ClientID != user.ID {
+		httpx.Fail(c, httpx.Forbidden("Akses ditolak"))
+		return
+	}
+
+	progress, _ := h.store.ListProjectProgress(c.Request.Context(), id)
+	maintList, _ := h.store.ListProjectMaintenance(c.Request.Context(), id)
+	maintLogs, _ := h.store.ListMaintenanceLogs(c.Request.Context(), id)
+	invoices, _ := h.store.ListProjectInvoices(c.Request.Context(), id)
+	auditLogs, _ := h.store.ListAuditLogs(c.Request.Context(), id)
+
+	clientInvoices := []domain.ProjectInvoice{}
+	for _, inv := range invoices {
+		if inv.Status != domain.InvoiceStatusDraft {
+			clientInvoices = append(clientInvoices, inv)
+		}
+	}
+
+	httpx.OK(c, "Report data project", gin.H{
+		"project":     project,
+		"progress":    h.normalizeProjectProgress(progress),
+		"maintenance": maintList,
+		"maintLogs":   maintLogs,
+		"invoices":    h.normalizeProjectInvoices(clientInvoices),
+		"history":     auditLogs,
+	})
+}
+
+func (h Handler) updateClientProfile(c *gin.Context) {
+	var input struct {
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload profil tidak valid", err.Error()))
+		return
+	}
+
+	user := currentUser(c)
+	if input.Name == "" || input.Email == "" {
+		httpx.Fail(c, httpx.Validation("Nama dan email wajib diisi", ""))
+		return
+	}
+
+	if err := h.store.UpdateUserProfile(c.Request.Context(), user.ID, input.Name, input.Email); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	if input.Password != "" {
+		if len(input.Password) < 8 {
+			httpx.Fail(c, httpx.Validation("Password minimal 8 karakter", ""))
+			return
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+		if err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		if err := h.store.UpdateUserPassword(c.Request.Context(), user.ID, string(hash)); err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+	}
+
+	httpx.OK(c, "Profil berhasil diperbarui", gin.H{})
+}
+
+func (h Handler) adminUploadFile(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		httpx.Fail(c, httpx.BadRequest("File wajib diunggah", err.Error()))
+		return
+	}
+
+	url, err := h.uploadService.UploadFile(c.Request.Context(), file, service.UploadPathOptions{
+		ClientID:  c.PostForm("clientId"),
+		ProjectID: c.PostForm("projectId"),
+		Category:  c.DefaultPostForm("category", "documents"),
+	})
+	if err != nil {
+		httpx.Fail(c, httpx.BadRequest("Gagal mengunggah file", err.Error()))
+		return
+	}
+
+	httpx.OK(c, "File berhasil diunggah", gin.H{"url": url})
+}
+
+func (h Handler) clientCreateMaintenanceRequest(c *gin.Context) {
+	id := c.Param("id")
+	user := currentUser(c)
+	project, err := h.store.GetProjectByID(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if project.ClientID != user.ID {
+		httpx.Fail(c, httpx.Forbidden("Akses ditolak"))
+		return
+	}
+
+	var input struct {
+		MaintenanceID string `json:"maintenanceId"`
+		Description   string `json:"description"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload request tidak valid", err.Error()))
+		return
+	}
+
+	if input.MaintenanceID == "" {
+		httpx.Fail(c, httpx.Validation("Pilih paket/layanan maintenance", ""))
+		return
+	}
+	if input.Description == "" {
+		httpx.Fail(c, httpx.Validation("Deskripsi request maintenance wajib diisi", "description is required"))
+		return
+	}
+
+	maint, err := h.store.GetProjectMaintenanceByID(c.Request.Context(), input.MaintenanceID)
+	if err != nil {
+		httpx.Fail(c, httpx.BadRequest("Paket maintenance tidak ditemukan", err.Error()))
+		return
+	}
+	if maint.ProjectID != id {
+		httpx.Fail(c, httpx.Forbidden("Akses ditolak untuk paket ini"))
+		return
+	}
+	if maint.QuotaUsed >= maint.QuotaLimit {
+		httpx.Fail(c, httpx.BadRequest("Kuota maintenance Anda untuk paket ini telah habis", "no quota left"))
+		return
+	}
+
+	log, err := h.clientService.CreateMaintenanceLog(c.Request.Context(), id, domain.MaintenanceLog{
+		Description: input.Description,
+		Status:      domain.ProgressStatusPending,
+		PICName:     "Awaiting Assignment",
+		RequestDate: time.Now().Format("2006-01-02"),
+	}, input.MaintenanceID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.Created(c, "Request maintenance berhasil dikirim", log)
+}
+
+func (h Handler) adminAllMaintenanceLogs(c *gin.Context) {
+	logs, err := h.store.ListAllMaintenanceLogs(c.Request.Context())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, "Semua log maintenance", logs)
+}
+
+func (h Handler) adminUpdateMaintenanceLogStatus(c *gin.Context) {
+	logId := c.Param("logId")
+	var input struct {
+		Status domain.ProgressStatus `json:"status"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.Fail(c, httpx.BadRequest("Payload status tidak valid", err.Error()))
+		return
+	}
+
+	if input.Status != domain.ProgressStatusPending && input.Status != domain.ProgressStatusInProgress && input.Status != domain.ProgressStatusCompleted {
+		httpx.Fail(c, httpx.Validation("Status tidak valid", ""))
+		return
+	}
+
+	err := h.store.UpdateMaintenanceLogStatus(c.Request.Context(), logId, input.Status)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Status maintenance log diperbarui", gin.H{})
+}
+
+func (h Handler) clientNotifications(c *gin.Context) {
+	user := currentUser(c)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "5"))
+	if pageSize <= 0 || pageSize > 20 {
+		pageSize = 5
+	}
+
+	limit := pageSize
+	offset := (page - 1) * pageSize
+
+	logs, total, err := h.store.ListClientNotifications(c.Request.Context(), user.ID, limit, offset)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	httpx.OK(c, "Notifikasi klien", gin.H{
+		"data":       logs,
+		"total":      total,
+		"page":       page,
+		"pageSize":   pageSize,
+		"totalPages": ceilDiv(total, pageSize),
 	})
 }

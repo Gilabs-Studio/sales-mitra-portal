@@ -69,12 +69,22 @@ func Open(databaseURL string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	// Use a pool so reads don't block each other (WAL mode allows concurrent reads)
+	db.SetMaxOpenConns(4)
+	db.SetMaxIdleConns(4)
 
-	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
-		db.Close()
-		return nil, err
+	pragmas := []string{
+		"PRAGMA journal_mode = WAL",
+		"PRAGMA busy_timeout = 10000", // 10s wait instead of instant fail
+		"PRAGMA foreign_keys = ON",
+		"PRAGMA cache_size = -8000", // 8MB page cache
+		"PRAGMA synchronous = NORMAL",
+	}
+	for _, p := range pragmas {
+		if _, err := db.Exec(p); err != nil {
+			db.Close()
+			return nil, err
+		}
 	}
 
 	return db, nil
@@ -85,6 +95,25 @@ func New(db *sql.DB) *Store {
 }
 
 func (s *Store) Migrate() error {
+	var oldExists int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='client_projects'`).Scan(&oldExists)
+	if err == nil && oldExists > 0 {
+		oldTables := []string{
+			"DROP TABLE IF EXISTS project_progress",
+			"DROP TABLE IF EXISTS project_documents",
+			"DROP TABLE IF EXISTS project_invoices",
+			"DROP TABLE IF EXISTS client_projects",
+			"DROP TABLE IF EXISTS maintenance_plans",
+			"DROP TABLE IF EXISTS maintenance_logs",
+			"DROP TABLE IF EXISTS project_activities",
+		}
+		for _, stmt := range oldTables {
+			if _, err := s.db.Exec(stmt); err != nil {
+				return err
+			}
+		}
+	}
+
 	tables := []string{
 		`CREATE TABLE IF NOT EXISTS users (
 			id TEXT PRIMARY KEY,
@@ -92,8 +121,9 @@ func (s *Store) Migrate() error {
 			username TEXT NOT NULL DEFAULT '',
 			email TEXT NOT NULL UNIQUE,
 			password_hash TEXT NOT NULL,
-			role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'partner')),
+			role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'partner', 'client')),
 			partner_code TEXT NOT NULL DEFAULT '',
+			lead_email_notifications_enabled INTEGER NOT NULL DEFAULT 1,
 			is_suspended INTEGER NOT NULL DEFAULT 0,
 			suspended_reason TEXT NOT NULL DEFAULT '',
 			suspended_at TEXT NOT NULL DEFAULT '',
@@ -175,6 +205,84 @@ func (s *Store) Migrate() error {
 			evidence_url TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS projects (
+			id TEXT PRIMARY KEY,
+			client_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			pic_name TEXT NOT NULL DEFAULT '',
+			pic_contact TEXT NOT NULL DEFAULT '',
+			start_date TEXT NOT NULL DEFAULT '',
+			target_end_date TEXT NOT NULL DEFAULT '',
+			status TEXT NOT NULL DEFAULT 'discovery' CHECK (status IN ('discovery', 'planning', 'development', 'testing', 'deployment', 'completed', 'maintenance')),
+			website_url TEXT NOT NULL DEFAULT '',
+			staging_url TEXT NOT NULL DEFAULT '',
+			credentials TEXT NOT NULL DEFAULT '',
+			documentation TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS project_progress (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			title TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed')),
+			percentage INTEGER NOT NULL DEFAULT 0,
+			update_date TEXT NOT NULL DEFAULT '',
+			notes TEXT NOT NULL DEFAULT '',
+			document_url TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS project_documents (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			title TEXT NOT NULL,
+			document_url TEXT NOT NULL,
+			uploaded_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS project_maintenance (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,
+			package_name TEXT NOT NULL,
+			start_date TEXT NOT NULL,
+			end_date TEXT NOT NULL,
+			quota_limit INTEGER NOT NULL DEFAULT 0,
+			quota_used INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS project_maintenance_logs (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			request_date TEXT NOT NULL,
+			description TEXT NOT NULL,
+			status TEXT NOT NULL CHECK (status IN ('pending', 'in_progress', 'completed')),
+			pic_name TEXT NOT NULL,
+			created_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS project_invoices (
+			id TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			invoice_number TEXT NOT NULL UNIQUE,
+			amount INTEGER NOT NULL DEFAULT 0,
+			status TEXT NOT NULL CHECK (status IN ('draft', 'sent', 'waiting_payment', 'paid', 'overdue')),
+			issue_date TEXT NOT NULL,
+			due_date TEXT NOT NULL,
+			document_url TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS audit_logs (
+			id TEXT PRIMARY KEY,
+			actor_id TEXT NOT NULL,
+			actor_name TEXT NOT NULL,
+			actor_role TEXT NOT NULL,
+			action TEXT NOT NULL,
+			target_type TEXT NOT NULL,
+			target_id TEXT NOT NULL,
+			details TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL
+		)`,
 	}
 
 	indexes := []string{
@@ -188,6 +296,9 @@ func (s *Store) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_referrals_partner ON referrals(partner_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_lead_payouts_lead ON lead_payouts(lead_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user ON password_reset_tokens(user_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_projects_client ON projects(client_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_project_progress_project ON project_progress(project_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_project_invoices_project ON project_invoices(project_id, created_at DESC)`,
 	}
 
 	tx, err := s.db.Begin()
@@ -212,6 +323,9 @@ func (s *Store) Migrate() error {
 		return err
 	}
 	if err := addColumnIfMissing(tx, "users", "suspended_at", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing(tx, "users", "lead_email_notifications_enabled", "INTEGER NOT NULL DEFAULT 1"); err != nil {
 		return err
 	}
 
@@ -245,16 +359,27 @@ func updateUsersRoleConstraint(tx *sql.Tx) error {
 		return err
 	}
 
-	if strings.Contains(schemaSQL, "'super_admin'") {
+	if strings.Contains(schemaSQL, "'client'") {
 		return nil
 	}
 
-	updatedSchema := strings.Replace(
-		schemaSQL,
-		"CHECK (role IN ('admin', 'partner'))",
-		"CHECK (role IN ('super_admin', 'admin', 'partner'))",
-		1,
-	)
+	var updatedSchema string
+	if strings.Contains(schemaSQL, "'super_admin'") {
+		updatedSchema = strings.Replace(
+			schemaSQL,
+			"CHECK (role IN ('super_admin', 'admin', 'partner'))",
+			"CHECK (role IN ('super_admin', 'admin', 'partner', 'client'))",
+			1,
+		)
+	} else {
+		updatedSchema = strings.Replace(
+			schemaSQL,
+			"CHECK (role IN ('admin', 'partner'))",
+			"CHECK (role IN ('super_admin', 'admin', 'partner', 'client'))",
+			1,
+		)
+	}
+
 	if updatedSchema == schemaSQL {
 		return fmt.Errorf("gagal memperbarui constraint role users")
 	}
@@ -387,8 +512,8 @@ func (s *Store) SeedKnowledge(ctx context.Context) error {
 func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash string) error {
 	_, err := s.db.ExecContext(
 		ctx,
-		`INSERT INTO users (id, name, username, email, password_hash, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO users (id, name, username, email, password_hash, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		user.ID,
 		user.Name,
 		strings.ToLower(user.Username),
@@ -396,6 +521,7 @@ func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash s
 		passwordHash,
 		user.Role,
 		user.PartnerCode,
+		boolToInt(user.LeadEmailNotificationsEnabled),
 		boolToInt(user.IsSuspended),
 		user.SuspendedReason,
 		formatOptionalTime(user.SuspendedAt),
@@ -407,7 +533,7 @@ func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash s
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (domain.UserAuth, error) {
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, name, username, email, password_hash, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
+		`SELECT id, name, username, email, password_hash, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at
 		 FROM users
 		 WHERE email = ?`,
 		strings.ToLower(email),
@@ -419,7 +545,7 @@ func (s *Store) GetUserByLogin(ctx context.Context, login string) (domain.UserAu
 	login = strings.ToLower(strings.TrimSpace(login))
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, name, username, email, password_hash, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
+		`SELECT id, name, username, email, password_hash, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at
 		 FROM users
 		 WHERE email = ? OR username = ?`,
 		login,
@@ -431,7 +557,7 @@ func (s *Store) GetUserByLogin(ctx context.Context, login string) (domain.UserAu
 func (s *Store) GetUserAuthByID(ctx context.Context, id string) (domain.UserAuth, error) {
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, name, username, email, password_hash, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
+		`SELECT id, name, username, email, password_hash, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at
 		 FROM users
 		 WHERE id = ?`,
 		id,
@@ -442,22 +568,24 @@ func (s *Store) GetUserAuthByID(ctx context.Context, id string) (domain.UserAuth
 func (s *Store) GetUserByID(ctx context.Context, id string) (domain.User, error) {
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, name, username, email, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
+		`SELECT id, name, username, email, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at
 		 FROM users
 		 WHERE id = ?`,
 		id,
 	)
 
 	var user domain.User
+	var leadEmailNotificationsEnabled int
 	var isSuspended int
 	var suspendedAt string
 	var createdAt string
-	if err := row.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt); err != nil {
+	if err := row.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &leadEmailNotificationsEnabled, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.User{}, ErrNotFound
 		}
 		return domain.User{}, err
 	}
+	user.LeadEmailNotificationsEnabled = intToBool(leadEmailNotificationsEnabled)
 	user.IsSuspended = intToBool(isSuspended)
 	user.SuspendedAt = parseOptionalTime(suspendedAt)
 	user.CreatedAt = parseTime(createdAt)
@@ -483,7 +611,7 @@ func (s *Store) ListUsersByRoles(ctx context.Context, roles ...domain.Role) ([]d
 	rows, err := s.db.QueryContext(
 		ctx,
 		fmt.Sprintf(
-			`SELECT id, name, username, email, role, partner_code, is_suspended, suspended_reason, suspended_at, created_at
+			`SELECT id, name, username, email, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at
 			 FROM users
 			 WHERE role IN (%s)
 			 ORDER BY created_at ASC`,
@@ -499,12 +627,14 @@ func (s *Store) ListUsersByRoles(ctx context.Context, roles ...domain.Role) ([]d
 	users := []domain.User{}
 	for rows.Next() {
 		var user domain.User
+		var leadEmailNotificationsEnabled int
 		var isSuspended int
 		var suspendedAt string
 		var createdAt string
-		if err := rows.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &leadEmailNotificationsEnabled, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt); err != nil {
 			return nil, err
 		}
+		user.LeadEmailNotificationsEnabled = intToBool(leadEmailNotificationsEnabled)
 		user.IsSuspended = intToBool(isSuspended)
 		user.SuspendedAt = parseOptionalTime(suspendedAt)
 		user.CreatedAt = parseTime(createdAt)
@@ -619,7 +749,7 @@ func (s *Store) MarkPasswordResetTokensUsedByUser(ctx context.Context, userID st
 func (s *Store) GetPasswordResetToken(ctx context.Context, tokenHash string) (domain.User, string, error) {
 	row := s.db.QueryRowContext(
 		ctx,
-		`SELECT u.id, u.name, u.username, u.email, u.role, u.partner_code, u.is_suspended, u.suspended_reason, u.suspended_at, u.created_at,
+		`SELECT u.id, u.name, u.username, u.email, u.role, u.partner_code, u.lead_email_notifications_enabled, u.is_suspended, u.suspended_reason, u.suspended_at, u.created_at,
 			t.id, t.expires_at, t.used_at
 		FROM password_reset_tokens t
 		INNER JOIN users u ON u.id = t.user_id
@@ -629,18 +759,20 @@ func (s *Store) GetPasswordResetToken(ctx context.Context, tokenHash string) (do
 
 	var user domain.User
 	var tokenID string
+	var leadEmailNotificationsEnabled int
 	var isSuspended int
 	var suspendedAt string
 	var createdAt string
 	var expiresAt string
 	var usedAt string
-	if err := row.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt, &tokenID, &expiresAt, &usedAt); err != nil {
+	if err := row.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &leadEmailNotificationsEnabled, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt, &tokenID, &expiresAt, &usedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.User{}, "", ErrNotFound
 		}
 		return domain.User{}, "", err
 	}
 
+	user.LeadEmailNotificationsEnabled = intToBool(leadEmailNotificationsEnabled)
 	user.IsSuspended = intToBool(isSuspended)
 	user.SuspendedAt = parseOptionalTime(suspendedAt)
 	user.CreatedAt = parseTime(createdAt)
@@ -1160,7 +1292,7 @@ func (s *Store) ListPartnersWithStats(ctx context.Context, limit, offset int) ([
 
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT u.id, u.name, u.username, u.email, u.role, u.partner_code, u.is_suspended, u.suspended_reason, u.created_at,
+		`SELECT u.id, u.name, u.username, u.email, u.role, u.partner_code, u.lead_email_notifications_enabled, u.is_suspended, u.suspended_reason, u.created_at,
 			COUNT(l.id) AS total_leads,
 			COALESCE(SUM(CASE WHEN l.status = 'qualified' THEN 1 ELSE 0 END), 0) AS qualified_leads,
 			COALESCE(SUM(CASE WHEN l.status = 'won' THEN 1 ELSE 0 END), 0) AS won_leads,
@@ -1183,6 +1315,7 @@ func (s *Store) ListPartnersWithStats(ctx context.Context, limit, offset int) ([
 	for rows.Next() {
 		var partner domain.PartnerWithStats
 		var createdAt string
+		var leadEmailNotificationsEnabled int
 		var isSuspended int
 		if err := rows.Scan(
 			&partner.ID,
@@ -1191,6 +1324,7 @@ func (s *Store) ListPartnersWithStats(ctx context.Context, limit, offset int) ([
 			&partner.Email,
 			&partner.Role,
 			&partner.PartnerCode,
+			&leadEmailNotificationsEnabled,
 			&isSuspended,
 			&partner.SuspendedReason,
 			&createdAt,
@@ -1201,6 +1335,7 @@ func (s *Store) ListPartnersWithStats(ctx context.Context, limit, offset int) ([
 		); err != nil {
 			return nil, 0, err
 		}
+		partner.LeadEmailNotificationsEnabled = intToBool(leadEmailNotificationsEnabled)
 		partner.IsSuspended = intToBool(isSuspended)
 		partner.CreatedAt = parseTime(createdAt)
 		partners = append(partners, partner)
@@ -1382,6 +1517,7 @@ type userAuthScanner interface {
 
 func scanUserAuth(row userAuthScanner) (domain.UserAuth, error) {
 	var user domain.UserAuth
+	var leadEmailNotificationsEnabled int
 	var isSuspended int
 	var suspendedAt string
 	var createdAt string
@@ -1393,6 +1529,7 @@ func scanUserAuth(row userAuthScanner) (domain.UserAuth, error) {
 		&user.PasswordHash,
 		&user.Role,
 		&user.PartnerCode,
+		&leadEmailNotificationsEnabled,
 		&isSuspended,
 		&user.SuspendedReason,
 		&suspendedAt,
@@ -1403,6 +1540,7 @@ func scanUserAuth(row userAuthScanner) (domain.UserAuth, error) {
 		}
 		return domain.UserAuth{}, err
 	}
+	user.LeadEmailNotificationsEnabled = intToBool(leadEmailNotificationsEnabled)
 	user.IsSuspended = intToBool(isSuspended)
 	user.SuspendedAt = parseOptionalTime(suspendedAt)
 	user.CreatedAt = parseTime(createdAt)
@@ -1829,6 +1967,989 @@ func (s *Store) UpdateLeadCommission(ctx context.Context, leadID string, dealAmo
 		formatTime(time.Now().UTC()),
 		leadID,
 	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) ListClients(ctx context.Context, limit, offset int) ([]domain.User, int64, error) {
+	var total int64
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE role = 'client'").Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT id, name, username, email, role, partner_code, lead_email_notifications_enabled, is_suspended, suspended_reason, suspended_at, created_at
+		 FROM users
+		 WHERE role = 'client'
+		 ORDER BY name ASC
+		 LIMIT ? OFFSET ?`,
+		limit,
+		offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	clients := []domain.User{}
+	for rows.Next() {
+		var user domain.User
+		var leadEmailNotificationsEnabled int
+		var isSuspended int
+		var suspendedAt string
+		var createdAt string
+		if err := rows.Scan(&user.ID, &user.Name, &user.Username, &user.Email, &user.Role, &user.PartnerCode, &leadEmailNotificationsEnabled, &isSuspended, &user.SuspendedReason, &suspendedAt, &createdAt); err != nil {
+			return nil, 0, err
+		}
+		user.LeadEmailNotificationsEnabled = intToBool(leadEmailNotificationsEnabled)
+		user.IsSuspended = intToBool(isSuspended)
+		user.SuspendedAt = parseOptionalTime(suspendedAt)
+		user.CreatedAt = parseTime(createdAt)
+		clients = append(clients, user)
+	}
+	return clients, total, rows.Err()
+}
+
+func (s *Store) CreateProject(ctx context.Context, p domain.Project) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO projects (
+			id, client_id, name, description, pic_name, pic_contact, start_date, target_end_date, status,
+			website_url, staging_url, credentials, documentation, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID,
+		p.ClientID,
+		p.Name,
+		p.Description,
+		p.PICName,
+		p.PICContact,
+		p.StartDate,
+		p.TargetEndDate,
+		p.Status,
+		p.WebsiteURL,
+		p.StagingURL,
+		p.Credentials,
+		p.Documentation,
+		formatTime(p.CreatedAt),
+		formatTime(p.UpdatedAt),
+	)
+	return err
+}
+
+// ClientDashboardStats holds aggregated stats for the client dashboard.
+type ClientDashboardStats struct {
+	UnpaidInvoicesCount  int
+	UnpaidInvoicesAmount int64
+	Maintenance          []domain.ProjectMaintenance
+	RecentActivity       []domain.AuditLog
+}
+
+const clientAuditLogScope = `
+WITH client_projects AS (
+	SELECT id
+	FROM projects
+	WHERE client_id = ?
+)
+`
+
+const clientAuditLogFilter = `
+(
+	(target_type = 'project' AND target_id IN (SELECT id FROM client_projects))
+	OR (target_type = 'project_progress' AND target_id IN (
+		SELECT id FROM project_progress WHERE project_id IN (SELECT id FROM client_projects)
+	))
+	OR (target_type = 'project_document' AND target_id IN (
+		SELECT id FROM project_documents WHERE project_id IN (SELECT id FROM client_projects)
+	))
+	OR (target_type IN ('maintenance_log', 'project_maintenance_log') AND target_id IN (
+		SELECT id FROM project_maintenance_logs WHERE project_id IN (SELECT id FROM client_projects)
+	))
+	OR (target_type IN ('project_maintenance', 'maintenance') AND target_id IN (
+		SELECT id FROM project_maintenance WHERE project_id IN (SELECT id FROM client_projects)
+	))
+	OR (target_type = 'invoice' AND target_id IN (
+		SELECT id FROM project_invoices WHERE project_id IN (SELECT id FROM client_projects)
+	))
+)`
+
+// GetClientDashboardStats fetches all dashboard aggregates for a client in 3 efficient
+// queries instead of N queries per project, eliminating the N+1 problem.
+func (s *Store) GetClientDashboardStats(ctx context.Context, clientID string) (ClientDashboardStats, error) {
+	var stats ClientDashboardStats
+
+	// 1. Unpaid invoice count + sum (single query across all client projects)
+	err := s.db.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*), COALESCE(SUM(amount), 0)
+		 FROM project_invoices
+		 WHERE project_id IN (SELECT id FROM projects WHERE client_id = ?)
+		   AND status IN ('waiting_payment', 'overdue')`,
+		clientID,
+	).Scan(&stats.UnpaidInvoicesCount, &stats.UnpaidInvoicesAmount)
+	if err != nil {
+		return stats, err
+	}
+
+	// 2. Maintenance packages for all client projects (with dynamic quota)
+	currentMonth := time.Now().Format("2006-01")
+	mRows, err := s.db.QueryContext(
+		ctx,
+		`SELECT m.id, m.project_id, m.package_name, m.start_date, m.end_date, m.quota_limit,
+			(SELECT COUNT(*) FROM project_maintenance_logs l
+			 WHERE l.project_id = m.project_id
+			   AND l.request_date LIKE ?
+			   AND l.description LIKE ('%' || m.package_name || '%')
+			) AS quota_used_dynamic,
+			m.created_at, m.updated_at
+		 FROM project_maintenance m
+		 WHERE m.project_id IN (SELECT id FROM projects WHERE client_id = ?)
+		 ORDER BY m.created_at DESC`,
+		currentMonth+"%",
+		clientID,
+	)
+	if err != nil {
+		return stats, err
+	}
+	defer mRows.Close()
+	for mRows.Next() {
+		var pm domain.ProjectMaintenance
+		var createdAt, updatedAt string
+		if err := mRows.Scan(&pm.ID, &pm.ProjectID, &pm.PackageName, &pm.StartDate, &pm.EndDate, &pm.QuotaLimit, &pm.QuotaUsed, &createdAt, &updatedAt); err != nil {
+			return stats, err
+		}
+		pm.CreatedAt = parseTime(createdAt)
+		pm.UpdatedAt = parseTime(updatedAt)
+		stats.Maintenance = append(stats.Maintenance, pm)
+	}
+	if err := mRows.Err(); err != nil {
+		return stats, err
+	}
+
+	// 3. Recent activity / audit logs (top 10 across all client projects)
+	aRows, err := s.db.QueryContext(
+		ctx,
+		clientAuditLogScope+`SELECT id, actor_id, actor_name, actor_role, action, target_type, target_id, details, created_at
+		 FROM audit_logs
+		 WHERE `+clientAuditLogFilter+`
+		 ORDER BY created_at DESC
+		 LIMIT 10`,
+		clientID,
+	)
+	if err != nil {
+		return stats, err
+	}
+	defer aRows.Close()
+	for aRows.Next() {
+		var l domain.AuditLog
+		var createdAt string
+		if err := aRows.Scan(&l.ID, &l.ActorID, &l.ActorName, &l.ActorRole, &l.Action, &l.TargetType, &l.TargetID, &l.Details, &createdAt); err != nil {
+			return stats, err
+		}
+		l.CreatedAt = parseTime(createdAt)
+		stats.RecentActivity = append(stats.RecentActivity, l)
+	}
+	return stats, aRows.Err()
+}
+
+func (s *Store) ListProjects(ctx context.Context, clientID string) ([]domain.Project, error) {
+	query := `SELECT p.id, p.client_id, u.name as client_name, u.email as client_email, p.name, p.description, p.pic_name, p.pic_contact, p.start_date, p.target_end_date, p.status,
+			p.website_url, p.staging_url, p.credentials, p.documentation, p.created_at, p.updated_at
+		FROM projects p
+		INNER JOIN users u ON p.client_id = u.id`
+	args := []interface{}{}
+	if clientID != "" {
+		query += " WHERE p.client_id = ?"
+		args = append(args, clientID)
+	}
+	query += " ORDER BY p.created_at DESC"
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	projects := []domain.Project{}
+	for rows.Next() {
+		var p domain.Project
+		var createdAt, updatedAt string
+		if err := rows.Scan(
+			&p.ID, &p.ClientID, &p.ClientName, &p.ClientEmail, &p.Name, &p.Description, &p.PICName, &p.PICContact, &p.StartDate, &p.TargetEndDate, &p.Status,
+			&p.WebsiteURL, &p.StagingURL, &p.Credentials, &p.Documentation, &createdAt, &updatedAt,
+		); err != nil {
+			return nil, err
+		}
+		p.CreatedAt = parseTime(createdAt)
+		p.UpdatedAt = parseTime(updatedAt)
+		projects = append(projects, p)
+	}
+	return projects, rows.Err()
+}
+
+func (s *Store) GetProjectByID(ctx context.Context, id string) (domain.Project, error) {
+	row := s.db.QueryRowContext(
+		ctx,
+		`SELECT p.id, p.client_id, u.name as client_name, u.email as client_email, p.name, p.description, p.pic_name, p.pic_contact, p.start_date, p.target_end_date, p.status,
+			p.website_url, p.staging_url, p.credentials, p.documentation, p.created_at, p.updated_at
+		FROM projects p
+		INNER JOIN users u ON p.client_id = u.id
+		WHERE p.id = ?`,
+		id,
+	)
+
+	var p domain.Project
+	var createdAt, updatedAt string
+	if err := row.Scan(
+		&p.ID, &p.ClientID, &p.ClientName, &p.ClientEmail, &p.Name, &p.Description, &p.PICName, &p.PICContact, &p.StartDate, &p.TargetEndDate, &p.Status,
+		&p.WebsiteURL, &p.StagingURL, &p.Credentials, &p.Documentation, &createdAt, &updatedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Project{}, ErrNotFound
+		}
+		return domain.Project{}, err
+	}
+	p.CreatedAt = parseTime(createdAt)
+	p.UpdatedAt = parseTime(updatedAt)
+	return p, nil
+}
+
+func (s *Store) UpdateProject(ctx context.Context, p domain.Project) error {
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE projects SET
+			name = ?, description = ?, pic_name = ?, pic_contact = ?, start_date = ?, target_end_date = ?, status = ?,
+			website_url = ?, staging_url = ?, credentials = ?, documentation = ?, updated_at = ?
+		WHERE id = ?`,
+		p.Name,
+		p.Description,
+		p.PICName,
+		p.PICContact,
+		p.StartDate,
+		p.TargetEndDate,
+		p.Status,
+		p.WebsiteURL,
+		p.StagingURL,
+		p.Credentials,
+		p.Documentation,
+		formatTime(p.UpdatedAt),
+		p.ID,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteProject(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, "DELETE FROM projects WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) CreateProjectProgress(ctx context.Context, p domain.ProjectProgress) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO project_progress (id, project_id, title, status, percentage, update_date, notes, document_url, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID,
+		p.ProjectID,
+		p.Title,
+		p.Status,
+		p.Percentage,
+		p.UpdateDate,
+		p.Notes,
+		p.DocumentURL,
+		formatTime(p.CreatedAt),
+	)
+	return err
+}
+
+func (s *Store) ListProjectProgress(ctx context.Context, projectID string) ([]domain.ProjectProgress, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT id, project_id, title, status, percentage, update_date, notes, document_url, created_at
+		 FROM project_progress
+		 WHERE project_id = ?
+		 ORDER BY created_at DESC`,
+		projectID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	progress := []domain.ProjectProgress{}
+	for rows.Next() {
+		var p domain.ProjectProgress
+		var createdAt string
+		if err := rows.Scan(&p.ID, &p.ProjectID, &p.Title, &p.Status, &p.Percentage, &p.UpdateDate, &p.Notes, &p.DocumentURL, &createdAt); err != nil {
+			return nil, err
+		}
+		p.CreatedAt = parseTime(createdAt)
+		progress = append(progress, p)
+	}
+	return progress, rows.Err()
+}
+
+func (s *Store) DeleteProjectProgress(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, "DELETE FROM project_progress WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) UpdateProjectProgress(ctx context.Context, p domain.ProjectProgress) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`UPDATE project_progress SET
+			title = ?, status = ?, percentage = ?, update_date = ?, notes = ?, document_url = ?
+		WHERE id = ?`,
+		p.Title,
+		p.Status,
+		p.Percentage,
+		p.UpdateDate,
+		p.Notes,
+		p.DocumentURL,
+		p.ID,
+	)
+	return err
+}
+
+func (s *Store) CreateProjectDocument(ctx context.Context, d domain.ProjectDocument) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO project_documents (id, project_id, title, document_url, uploaded_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+		d.ID,
+		d.ProjectID,
+		d.Title,
+		d.DocumentURL,
+		formatTime(d.UploadedAt),
+	)
+	return err
+}
+
+func (s *Store) ListProjectDocuments(ctx context.Context, projectID string) ([]domain.ProjectDocument, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT id, project_id, title, document_url, uploaded_at
+		 FROM project_documents
+		 WHERE project_id = ?
+		 ORDER BY uploaded_at DESC`,
+		projectID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	docs := []domain.ProjectDocument{}
+	for rows.Next() {
+		var d domain.ProjectDocument
+		var uploadedAt string
+		if err := rows.Scan(&d.ID, &d.ProjectID, &d.Title, &d.DocumentURL, &uploadedAt); err != nil {
+			return nil, err
+		}
+		d.UploadedAt = parseTime(uploadedAt)
+		docs = append(docs, d)
+	}
+	return docs, rows.Err()
+}
+
+func (s *Store) DeleteProjectDocument(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, "DELETE FROM project_documents WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) CreateProjectMaintenance(ctx context.Context, pm domain.ProjectMaintenance) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO project_maintenance (id, project_id, package_name, start_date, end_date, quota_limit, quota_used, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		pm.ID,
+		pm.ProjectID,
+		pm.PackageName,
+		pm.StartDate,
+		pm.EndDate,
+		pm.QuotaLimit,
+		pm.QuotaUsed,
+		formatTime(pm.CreatedAt),
+		formatTime(pm.UpdatedAt),
+	)
+	return err
+}
+
+func (s *Store) UpdateProjectMaintenance(ctx context.Context, pm domain.ProjectMaintenance) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`UPDATE project_maintenance SET
+			package_name = ?, start_date = ?, end_date = ?, quota_limit = ?, quota_used = ?, updated_at = ?
+		 WHERE id = ?`,
+		pm.PackageName,
+		pm.StartDate,
+		pm.EndDate,
+		pm.QuotaLimit,
+		pm.QuotaUsed,
+		formatTime(time.Now().UTC()),
+		pm.ID,
+	)
+	return err
+}
+
+func (s *Store) DeleteProjectMaintenance(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, "DELETE FROM project_maintenance WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) CalculateMonthlyQuotaUsed(ctx context.Context, projectID string, packageName string) (int, error) {
+	currentMonth := time.Now().Format("2006-01") // YYYY-MM
+	var count int
+	err := s.db.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*)
+		 FROM project_maintenance_logs
+		 WHERE project_id = ? AND request_date LIKE ? AND description LIKE ?`,
+		projectID,
+		currentMonth+"%",
+		"["+packageName+"]%",
+	).Scan(&count)
+	return count, err
+}
+
+func (s *Store) GetProjectMaintenanceByID(ctx context.Context, id string) (domain.ProjectMaintenance, error) {
+	currentMonth := time.Now().Format("2006-01")
+	row := s.db.QueryRowContext(
+		ctx,
+		`SELECT m.id, m.project_id, m.package_name, m.start_date, m.end_date, m.quota_limit,
+			(SELECT COUNT(*) FROM project_maintenance_logs l
+			 WHERE l.project_id = m.project_id
+			   AND l.request_date LIKE ?
+			   AND l.description LIKE ('%' || m.package_name || '%')
+			) AS quota_used_dynamic,
+			m.created_at, m.updated_at
+		 FROM project_maintenance m
+		 WHERE m.id = ?`,
+		currentMonth+"%",
+		id,
+	)
+
+	var pm domain.ProjectMaintenance
+	var createdAt, updatedAt string
+	if err := row.Scan(&pm.ID, &pm.ProjectID, &pm.PackageName, &pm.StartDate, &pm.EndDate, &pm.QuotaLimit, &pm.QuotaUsed, &createdAt, &updatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ProjectMaintenance{}, ErrNotFound
+		}
+		return domain.ProjectMaintenance{}, err
+	}
+	pm.CreatedAt = parseTime(createdAt)
+	pm.UpdatedAt = parseTime(updatedAt)
+	return pm, nil
+}
+
+func (s *Store) ListProjectMaintenance(ctx context.Context, projectID string) ([]domain.ProjectMaintenance, error) {
+	currentMonth := time.Now().Format("2006-01")
+	// Use a SQL subquery to calculate monthly quota used in a single query,
+	// avoiding nested queries on an open rows cursor (SQLite deadlock).
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT m.id, m.project_id, m.package_name, m.start_date, m.end_date, m.quota_limit,
+			(SELECT COUNT(*) FROM project_maintenance_logs l
+			 WHERE l.project_id = m.project_id
+			   AND l.request_date LIKE ?
+			   AND l.description LIKE ('%' || m.package_name || '%')
+			) AS quota_used_dynamic,
+			m.created_at, m.updated_at
+		 FROM project_maintenance m
+		 WHERE m.project_id = ?
+		 ORDER BY m.created_at DESC`,
+		currentMonth+"%",
+		projectID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := []domain.ProjectMaintenance{}
+	for rows.Next() {
+		var pm domain.ProjectMaintenance
+		var createdAt, updatedAt string
+		if err := rows.Scan(&pm.ID, &pm.ProjectID, &pm.PackageName, &pm.StartDate, &pm.EndDate, &pm.QuotaLimit, &pm.QuotaUsed, &createdAt, &updatedAt); err != nil {
+			return nil, err
+		}
+		pm.CreatedAt = parseTime(createdAt)
+		pm.UpdatedAt = parseTime(updatedAt)
+		list = append(list, pm)
+	}
+	return list, rows.Err()
+}
+
+func (s *Store) GetProjectMaintenance(ctx context.Context, projectID string) (domain.ProjectMaintenance, error) {
+	list, err := s.ListProjectMaintenance(ctx, projectID)
+	if err != nil {
+		return domain.ProjectMaintenance{}, err
+	}
+	if len(list) == 0 {
+		return domain.ProjectMaintenance{}, ErrNotFound
+	}
+	return list[0], nil
+}
+
+func (s *Store) IncrementMaintenanceQuotaUsed(ctx context.Context, id string, delta int) error {
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE project_maintenance
+		 SET quota_used = quota_used + ?, updated_at = ?
+		 WHERE id = ?`,
+		delta,
+		formatTime(time.Now().UTC()),
+		id,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) CreateMaintenanceLog(ctx context.Context, log domain.MaintenanceLog) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO project_maintenance_logs (id, project_id, request_date, description, status, pic_name, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		log.ID,
+		log.ProjectID,
+		log.RequestDate,
+		log.Description,
+		log.Status,
+		log.PICName,
+		formatTime(log.CreatedAt),
+	)
+	return err
+}
+
+func (s *Store) ListMaintenanceLogs(ctx context.Context, projectID string) ([]domain.MaintenanceLog, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT id, project_id, request_date, description, status, pic_name, created_at
+		 FROM project_maintenance_logs
+		 WHERE project_id = ?
+		 ORDER BY created_at DESC`,
+		projectID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	logs := []domain.MaintenanceLog{}
+	for rows.Next() {
+		var l domain.MaintenanceLog
+		var createdAt string
+		if err := rows.Scan(&l.ID, &l.ProjectID, &l.RequestDate, &l.Description, &l.Status, &l.PICName, &createdAt); err != nil {
+			return nil, err
+		}
+		l.CreatedAt = parseTime(createdAt)
+		logs = append(logs, l)
+	}
+	return logs, rows.Err()
+}
+
+func (s *Store) DeleteMaintenanceLog(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, "DELETE FROM project_maintenance_logs WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) ListAllMaintenanceLogs(ctx context.Context) ([]domain.MaintenanceLog, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT l.id, l.project_id, p.name as project_name, l.request_date, l.description, l.status, l.pic_name, l.created_at
+		 FROM project_maintenance_logs l
+		 INNER JOIN projects p ON l.project_id = p.id
+		 ORDER BY l.created_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	logs := []domain.MaintenanceLog{}
+	for rows.Next() {
+		var l domain.MaintenanceLog
+		var createdAt string
+		if err := rows.Scan(&l.ID, &l.ProjectID, &l.ProjectName, &l.RequestDate, &l.Description, &l.Status, &l.PICName, &createdAt); err != nil {
+			return nil, err
+		}
+		l.CreatedAt = parseTime(createdAt)
+		logs = append(logs, l)
+	}
+	return logs, rows.Err()
+}
+
+func (s *Store) UpdateMaintenanceLogStatus(ctx context.Context, id string, status domain.ProgressStatus) error {
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE project_maintenance_logs
+		 SET status = ?
+		 WHERE id = ?`,
+		status,
+		id,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) ListClientNotifications(ctx context.Context, clientID string, limit, offset int) ([]domain.AuditLog, int, error) {
+	var total int
+	err := s.db.QueryRowContext(
+		ctx,
+		clientAuditLogScope+`SELECT COUNT(*)
+		 FROM audit_logs
+		 WHERE `+clientAuditLogFilter,
+		clientID,
+	).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := s.db.QueryContext(
+		ctx,
+		clientAuditLogScope+`SELECT id, actor_id, actor_name, actor_role, action, target_type, target_id, details, created_at
+		 FROM audit_logs
+		 WHERE `+clientAuditLogFilter+`
+		 ORDER BY created_at DESC
+		 LIMIT ? OFFSET ?`,
+		clientID,
+		limit,
+		offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	logs := []domain.AuditLog{}
+	for rows.Next() {
+		var l domain.AuditLog
+		var createdAt string
+		if err := rows.Scan(&l.ID, &l.ActorID, &l.ActorName, &l.ActorRole, &l.Action, &l.TargetType, &l.TargetID, &l.Details, &createdAt); err != nil {
+			return nil, 0, err
+		}
+		l.CreatedAt = parseTime(createdAt)
+		logs = append(logs, l)
+	}
+	return logs, total, rows.Err()
+}
+
+func (s *Store) CreateProjectInvoice(ctx context.Context, inv domain.ProjectInvoice) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO project_invoices (id, project_id, invoice_number, amount, status, issue_date, due_date, document_url, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		inv.ID,
+		inv.ProjectID,
+		inv.InvoiceNumber,
+		inv.Amount,
+		inv.Status,
+		inv.IssueDate,
+		inv.DueDate,
+		inv.DocumentURL,
+		formatTime(inv.CreatedAt),
+		formatTime(inv.UpdatedAt),
+	)
+	return err
+}
+
+func (s *Store) ListProjectInvoices(ctx context.Context, projectID string) ([]domain.ProjectInvoice, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT id, project_id, invoice_number, amount, status, issue_date, due_date, document_url, created_at, updated_at
+		 FROM project_invoices
+		 WHERE project_id = ?
+		 ORDER BY issue_date DESC`,
+		projectID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	invoices := []domain.ProjectInvoice{}
+	for rows.Next() {
+		var inv domain.ProjectInvoice
+		var createdAt, updatedAt string
+		if err := rows.Scan(&inv.ID, &inv.ProjectID, &inv.InvoiceNumber, &inv.Amount, &inv.Status, &inv.IssueDate, &inv.DueDate, &inv.DocumentURL, &createdAt, &updatedAt); err != nil {
+			return nil, err
+		}
+		inv.CreatedAt = parseTime(createdAt)
+		inv.UpdatedAt = parseTime(updatedAt)
+		invoices = append(invoices, inv)
+	}
+	return invoices, rows.Err()
+}
+
+func (s *Store) GetProjectInvoiceByID(ctx context.Context, id string) (domain.ProjectInvoice, error) {
+	row := s.db.QueryRowContext(
+		ctx,
+		`SELECT i.id, i.project_id, p.name as project_name, i.invoice_number, i.amount, i.status, i.issue_date, i.due_date, i.document_url, i.created_at, i.updated_at
+		 FROM project_invoices i
+		 INNER JOIN projects p ON i.project_id = p.id
+		 WHERE i.id = ?`,
+		id,
+	)
+
+	var inv domain.ProjectInvoice
+	var createdAt, updatedAt string
+	if err := row.Scan(&inv.ID, &inv.ProjectID, &inv.ProjectName, &inv.InvoiceNumber, &inv.Amount, &inv.Status, &inv.IssueDate, &inv.DueDate, &inv.DocumentURL, &createdAt, &updatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ProjectInvoice{}, ErrNotFound
+		}
+		return domain.ProjectInvoice{}, err
+	}
+	inv.CreatedAt = parseTime(createdAt)
+	inv.UpdatedAt = parseTime(updatedAt)
+	return inv, nil
+}
+
+func (s *Store) UpdateProjectInvoiceStatus(ctx context.Context, id string, status domain.InvoiceStatus) error {
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE project_invoices
+		 SET status = ?, updated_at = ?
+		 WHERE id = ?`,
+		status,
+		formatTime(time.Now().UTC()),
+		id,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) UpdateProjectInvoice(ctx context.Context, inv domain.ProjectInvoice) error {
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE project_invoices
+		 SET invoice_number = ?, amount = ?, status = ?, issue_date = ?, due_date = ?, document_url = ?, updated_at = ?
+		 WHERE id = ?`,
+		inv.InvoiceNumber,
+		inv.Amount,
+		inv.Status,
+		inv.IssueDate,
+		inv.DueDate,
+		inv.DocumentURL,
+		formatTime(inv.UpdatedAt),
+		inv.ID,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteProjectInvoice(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, "DELETE FROM project_invoices WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) CreateAuditLog(ctx context.Context, log domain.AuditLog) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO audit_logs (id, actor_id, actor_name, actor_role, action, target_type, target_id, details, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		log.ID,
+		log.ActorID,
+		log.ActorName,
+		log.ActorRole,
+		log.Action,
+		log.TargetType,
+		log.TargetID,
+		log.Details,
+		formatTime(log.CreatedAt),
+	)
+	return err
+}
+
+func (s *Store) ListAuditLogs(ctx context.Context, projectID string) ([]domain.AuditLog, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT id, actor_id, actor_name, actor_role, action, target_type, target_id, details, created_at
+		 FROM audit_logs
+		 WHERE target_id = ? OR details LIKE ?
+		 ORDER BY created_at DESC`,
+		projectID,
+		"%"+projectID+"%",
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	logs := []domain.AuditLog{}
+	for rows.Next() {
+		var l domain.AuditLog
+		var createdAt string
+		if err := rows.Scan(&l.ID, &l.ActorID, &l.ActorName, &l.ActorRole, &l.Action, &l.TargetType, &l.TargetID, &l.Details, &createdAt); err != nil {
+			return nil, err
+		}
+		l.CreatedAt = parseTime(createdAt)
+		logs = append(logs, l)
+	}
+	return logs, rows.Err()
+}
+
+func (s *Store) UpdateUserProfile(ctx context.Context, id string, name string, email string) error {
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE users
+		 SET name = ?, email = ?
+		 WHERE id = ?`,
+		name,
+		strings.ToLower(strings.TrimSpace(email)),
+		id,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) UpdateLeadEmailNotificationsEnabled(ctx context.Context, userID string, enabled bool) error {
+	result, err := s.db.ExecContext(
+		ctx,
+		`UPDATE users
+		 SET lead_email_notifications_enabled = ?
+		 WHERE id = ?`,
+		boolToInt(enabled),
+		userID,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteClient(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, "DELETE FROM users WHERE id = ? AND role = 'client'", id)
 	if err != nil {
 		return err
 	}

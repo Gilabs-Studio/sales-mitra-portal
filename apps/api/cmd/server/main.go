@@ -30,12 +30,13 @@ func main() {
 	leadService := service.NewLeadService(repository, cfg, notificationService)
 	knowledgeService := service.NewKnowledgeService(repository, cfg)
 	serviceCatalogService := service.NewServiceCatalogService(repository)
+	clientProjectService := service.NewClientProjectService(repository, notificationService)
 
 	if err := seeder.New(repository, authService).Run(context.Background(), cfg); err != nil {
 		log.Fatalf("run seeders: %v", err)
 	}
 
-	router := server.NewRouter(cfg, repository, authService, leadService, knowledgeService, serviceCatalogService)
+	router := server.NewRouter(cfg, repository, authService, leadService, knowledgeService, serviceCatalogService, clientProjectService)
 	log.Printf("mitra sales portal api listening on :%s", cfg.Port)
 	if err := router.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("run server: %v", err)

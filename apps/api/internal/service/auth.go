@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"html"
 	"strings"
 	"time"
 
@@ -98,6 +99,7 @@ func (s *AuthService) RegisterPartner(ctx context.Context, input RegisterInput) 
 		Email:       input.Email,
 		Role:        domain.RolePartner,
 		PartnerCode: uniquePartnerCode(input.Name, s.cfg.ReferralCodeSeed),
+		LeadEmailNotificationsEnabled: true,
 		CreatedAt:   time.Now().UTC(),
 	}
 
@@ -140,6 +142,7 @@ func (s *AuthService) CreateAdmin(ctx context.Context, input CreateAdminInput) (
 		Username:  input.Username,
 		Email:     input.Email,
 		Role:      domain.RoleAdmin,
+		LeadEmailNotificationsEnabled: true,
 		CreatedAt: time.Now().UTC(),
 	}
 
@@ -148,6 +151,47 @@ func (s *AuthService) CreateAdmin(ctx context.Context, input CreateAdminInput) (
 			return domain.User{}, httpx.Conflict("Email atau username admin sudah terdaftar")
 		}
 		return domain.User{}, err
+	}
+
+	return user, nil
+}
+
+func (s *AuthService) CreateClient(ctx context.Context, name string, email string, password string) (domain.User, error) {
+	name = strings.TrimSpace(name)
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	if name == "" || email == "" || len(password) < 8 {
+		return domain.User{}, httpx.Validation("Data klien belum valid", "Nama, email, dan password minimal 8 karakter wajib diisi.")
+	}
+
+	hash, err := hashPassword(password)
+	if err != nil {
+		return domain.User{}, err
+	}
+
+	user := domain.User{
+		ID:        uuid.NewString(),
+		Name:      name,
+		Email:     email,
+		Role:      domain.RoleClient,
+		LeadEmailNotificationsEnabled: true,
+		CreatedAt: time.Now().UTC(),
+	}
+
+	if err := s.store.CreateUser(ctx, user, hash); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return domain.User{}, httpx.Conflict("Email klien sudah terdaftar")
+		}
+		return domain.User{}, err
+	}
+
+	if s.notifier != nil && s.notifier.Enabled() {
+		emailContent := notificationEmail{
+			Subject: "Selamat Datang di Portal GiLabs",
+			Text: fmt.Sprintf("Halo %s,\n\nAkun portal klien GiLabs Anda telah dibuat oleh admin.\n\nDetail Login:\nEmail: %s\nPassword: %s\n\nSilakan masuk melalui link berikut:\n%s\n\nAnda dapat mengganti password setelah login.", name, email, password, s.notifier.appBaseURL+"/client/login"),
+			HTML: fmt.Sprintf("<p>Halo %s,</p><p>Akun portal klien GiLabs Anda telah dibuat oleh admin.</p><p><strong>Detail Login:</strong><br/>Email: %s<br/>Password: %s</p><p><a href=\"%s\">Masuk ke Portal Klien</a></p><p>Anda dapat mengganti password setelah login.</p>", html.EscapeString(name), html.EscapeString(email), html.EscapeString(password), s.notifier.appBaseURL+"/client/login"),
+		}
+		s.notifier.sendAsync(ctx, []string{email}, emailContent)
 	}
 
 	return user, nil
@@ -266,6 +310,27 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID string, input C
 	return s.store.UpdateUserPassword(ctx, userID, hash)
 }
 
+func (s *AuthService) UpdateLeadEmailNotificationsEnabled(ctx context.Context, userID string, enabled bool) (domain.User, error) {
+	user, err := s.store.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return domain.User{}, httpx.NotFound("Pengguna tidak ditemukan")
+		}
+		return domain.User{}, err
+	}
+	if user.IsSuspended {
+		return domain.User{}, httpx.Forbidden("Akun sedang disuspend dan tidak bisa diakses")
+	}
+	if err := s.store.UpdateLeadEmailNotificationsEnabled(ctx, userID, enabled); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return domain.User{}, httpx.NotFound("Pengguna tidak ditemukan")
+		}
+		return domain.User{}, err
+	}
+	user.LeadEmailNotificationsEnabled = enabled
+	return user, nil
+}
+
 func (s *AuthService) ConfirmPasswordReset(ctx context.Context, input PasswordResetConfirmInput) error {
 	token := strings.TrimSpace(input.Token)
 	if token == "" || len(input.Password) < 8 {
@@ -378,6 +443,7 @@ func (s *AuthService) ensureUser(ctx context.Context, name string, username stri
 		Email:       strings.ToLower(email),
 		Role:        role,
 		PartnerCode: partnerCode,
+		LeadEmailNotificationsEnabled: true,
 		CreatedAt:   time.Now().UTC(),
 	}
 

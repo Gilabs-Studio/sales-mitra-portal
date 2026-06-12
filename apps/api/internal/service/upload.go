@@ -9,8 +9,8 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"mime/multipart"
-	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -24,6 +24,12 @@ import (
 type UploadService struct {
 	cfg      config.Config
 	s3Client *s3.Client
+}
+
+type UploadPathOptions struct {
+	ClientID  string
+	ProjectID string
+	Category  string
 }
 
 func NewUploadService(cfg config.Config) *UploadService {
@@ -55,7 +61,64 @@ func NewUploadService(cfg config.Config) *UploadService {
 	}
 }
 
-func (s *UploadService) UploadEvidence(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
+func sanitizePathSegment(segment string) string {
+	segment = strings.TrimSpace(segment)
+	segment = strings.Trim(segment, "/")
+	if segment == "" {
+		return ""
+	}
+
+	var builder strings.Builder
+	for _, r := range segment {
+		switch {
+		case r >= 'a' && r <= 'z':
+			builder.WriteRune(r)
+		case r >= 'A' && r <= 'Z':
+			builder.WriteRune(r + ('a' - 'A'))
+		case r >= '0' && r <= '9':
+			builder.WriteRune(r)
+		case r == '-', r == '_':
+			builder.WriteRune(r)
+		default:
+			builder.WriteRune('-')
+		}
+	}
+
+	cleaned := strings.Trim(builder.String(), "-")
+	return cleaned
+}
+
+func buildObjectKey(prefix UploadPathOptions, filename string) string {
+	parts := make([]string, 0, 4)
+	if clientID := sanitizePathSegment(prefix.ClientID); clientID != "" {
+		parts = append(parts, clientID)
+	}
+	if projectID := sanitizePathSegment(prefix.ProjectID); projectID != "" {
+		parts = append(parts, projectID)
+	}
+	if category := sanitizePathSegment(prefix.Category); category != "" {
+		parts = append(parts, category)
+	}
+	parts = append(parts, filename)
+	return strings.Join(parts, "/")
+}
+
+func publicObjectURL(baseURL string, key string, accountID string, bucketName string) string {
+	publicURL := baseURL
+	if publicURL == "" {
+		publicURL = fmt.Sprintf("https://%s.r2.cloudflarestorage.com/%s", accountID, bucketName)
+	}
+	if publicURL[len(publicURL)-1] != '/' {
+		publicURL += "/"
+	}
+	return publicURL + key
+}
+
+func (s *UploadService) UploadEvidence(ctx context.Context, fileHeader *multipart.FileHeader, prefix UploadPathOptions) (string, error) {
+	if s.s3Client == nil {
+		return "", fmt.Errorf("Cloudflare R2 is not configured")
+	}
+
 	file, err := fileHeader.Open()
 	if err != nil {
 		return "", err
@@ -76,43 +139,58 @@ func (s *UploadService) UploadEvidence(ctx context.Context, fileHeader *multipar
 	}
 
 	filename := fmt.Sprintf("payout-%s-%d.jpg", uuid.NewString(), time.Now().Unix())
+	objectKey := buildObjectKey(prefix, filename)
 
-	// If R2 client is configured, upload to Cloudflare R2
-	if s.s3Client != nil {
-		contentType := "image/jpeg"
-		_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
-			Bucket:      aws.String(s.cfg.R2BucketName),
-			Key:         aws.String(filename),
-			Body:        bytes.NewReader(imageBuf.Bytes()),
-			ContentType: aws.String(contentType),
-		})
-		if err == nil {
-			publicURL := s.cfg.R2PublicURL
-			if publicURL == "" {
-				publicURL = fmt.Sprintf("https://%s.r2.cloudflarestorage.com/%s", s.cfg.R2AccountID, s.cfg.R2BucketName)
-			}
-			// ensure trailing slash
-			if publicURL[len(publicURL)-1] != '/' {
-				publicURL += "/"
-			}
-			return publicURL + filename, nil
-		}
-		// Log error and fallback to local storage
-		fmt.Printf("R2 Upload failed: %v, falling back to local storage\n", err)
-	}
-
-	// Fallback: Local Storage
-	localDir := "./data/uploads"
-	if err := os.MkdirAll(localDir, 0755); err != nil {
-		return "", fmt.Errorf("gagal membuat folder upload lokal: %w", err)
-	}
-
-	localPath := filepath.Join(localDir, filename)
-	err = os.WriteFile(localPath, imageBuf.Bytes(), 0644)
+	contentType := "image/jpeg"
+	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(s.cfg.R2BucketName),
+		Key:         aws.String(objectKey),
+		Body:        bytes.NewReader(imageBuf.Bytes()),
+		ContentType: aws.String(contentType),
+	})
 	if err != nil {
-		return "", fmt.Errorf("gagal menyimpan file bukti lokal: %w", err)
+		return "", fmt.Errorf("gagal mengupload ke Cloudflare R2: %w", err)
 	}
 
-	// Return local public static link
-	return fmt.Sprintf("/uploads/%s", filename), nil
+	return publicObjectURL(s.cfg.R2PublicURL, objectKey, s.cfg.R2AccountID, s.cfg.R2BucketName), nil
+}
+
+func (s *UploadService) UploadFile(ctx context.Context, fileHeader *multipart.FileHeader, prefix UploadPathOptions) (string, error) {
+	if s.s3Client == nil {
+		return "", fmt.Errorf("Cloudflare R2 is not configured")
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	var fileBuf bytes.Buffer
+	if _, err := fileBuf.ReadFrom(file); err != nil {
+		return "", err
+	}
+
+	ext := filepath.Ext(fileHeader.Filename)
+	if ext == "" {
+		ext = ".pdf"
+	}
+	filename := fmt.Sprintf("doc-%s-%d%s", uuid.NewString(), time.Now().Unix(), ext)
+	objectKey := buildObjectKey(prefix, filename)
+
+	contentType := fileHeader.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/pdf"
+	}
+	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(s.cfg.R2BucketName),
+		Key:         aws.String(objectKey),
+		Body:        bytes.NewReader(fileBuf.Bytes()),
+		ContentType: aws.String(contentType),
+	})
+	if err != nil {
+		return "", fmt.Errorf("gagal mengupload ke Cloudflare R2: %w", err)
+	}
+
+	return publicObjectURL(s.cfg.R2PublicURL, objectKey, s.cfg.R2AccountID, s.cfg.R2BucketName), nil
 }

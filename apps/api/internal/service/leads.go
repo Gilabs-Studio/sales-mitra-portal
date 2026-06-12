@@ -136,7 +136,7 @@ func (s *LeadService) SendMessage(ctx context.Context, leadID string, sender dom
 }
 
 func (s *LeadService) notifyAdminsAboutNewLead(ctx context.Context, lead domain.Lead, partner domain.User) {
-	recipients := s.adminRecipientEmails(ctx)
+	recipients := s.adminLeadNotificationRecipientEmails(ctx)
 	s.notifier.NotifyAdminsNewLead(
 		ctx,
 		recipients,
@@ -201,6 +201,44 @@ func (s *LeadService) adminRecipientEmails(ctx context.Context) []string {
 	if _, exists := seen[s.cfg.AdminEmail]; !exists {
 		recipients = append(recipients, s.cfg.AdminEmail)
 	}
+	return recipients
+}
+
+func (s *LeadService) adminLeadNotificationRecipientEmails(ctx context.Context) []string {
+	admins, err := s.store.ListUsersByRoles(ctx, domain.RoleSuperAdmin, domain.RoleAdmin)
+	if err != nil {
+		return []string{s.cfg.AdminEmail}
+	}
+
+	recipients := make([]string, 0, len(admins)+1)
+	seenRecipients := map[string]struct{}{}
+	knownAdminEmails := map[string]struct{}{}
+
+	for _, admin := range admins {
+		email := strings.ToLower(strings.TrimSpace(admin.Email))
+		if email == "" {
+			continue
+		}
+		knownAdminEmails[email] = struct{}{}
+		if !admin.LeadEmailNotificationsEnabled {
+			continue
+		}
+		if _, exists := seenRecipients[email]; exists {
+			continue
+		}
+		seenRecipients[email] = struct{}{}
+		recipients = append(recipients, admin.Email)
+	}
+
+	configAdminEmail := strings.ToLower(strings.TrimSpace(s.cfg.AdminEmail))
+	if configAdminEmail != "" {
+		if _, belongsToKnownAdmin := knownAdminEmails[configAdminEmail]; !belongsToKnownAdmin {
+			if _, exists := seenRecipients[configAdminEmail]; !exists {
+				recipients = append(recipients, s.cfg.AdminEmail)
+			}
+		}
+	}
+
 	return recipients
 }
 
