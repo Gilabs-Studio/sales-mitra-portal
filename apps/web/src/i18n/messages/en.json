@@ -8,5 +8,10 @@
     "knowledge": "Knowledge",
     "login": "Login",
     "register": "Register"
+  },
+  "notFound": {
+    "title": "Page not found.",
+    "description": "The page you are looking for doesn't exist or has been moved.",
+    "backHome": "Return Home"
   }
 }

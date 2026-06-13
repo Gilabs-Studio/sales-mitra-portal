@@ -8,5 +8,10 @@
     "knowledge": "Knowledge",
     "login": "Masuk",
     "register": "Daftar"
+  },
+  "notFound": {
+    "title": "Halaman tidak ditemukan.",
+    "description": "Halaman yang Anda cari tidak ada atau telah dipindahkan.",
+    "backHome": "Kembali ke Beranda"
   }
 }
