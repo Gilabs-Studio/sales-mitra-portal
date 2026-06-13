@@ -48,8 +48,8 @@ export function PartnerDashboardScreen() {
           <BreakdownGrid title="Layanan" items={dashboard.data?.serviceBreakdown ?? []} />
         </div>
         <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-          <section>
-            <h2 className="mb-3 text-lg font-extrabold text-foreground">Lead terbaru</h2>
+          <section className="space-y-3">
+            <h2 className="text-sm font-extrabold tracking-tight text-foreground uppercase tracking-wider text-muted-foreground">Lead terbaru</h2>
             <LeadTable leads={dashboard.data?.recentLeads ?? []} />
           </section>
           <ReferralList referrals={dashboard.data?.referrals ?? []} />

@@ -65,14 +65,14 @@ export function AdminDashboardScreen() {
         )}
 
         {/* Client Maintenance Requests Section */}
-        <section className="rounded-lg border border-border bg-card p-6 space-y-4 shadow-sm">
-          <div className="flex items-center justify-between border-b border-border pb-3">
+        <section className="rounded-lg bg-secondary/45 p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-border/30 pb-3">
             <div className="space-y-1">
-              <h2 className="text-lg font-extrabold text-foreground flex items-center gap-2">
+              <h2 className="text-sm font-extrabold text-foreground flex items-center gap-2">
                 <Wrench className="h-4 w-4 text-primary" />
                 Request Maintenance Klien
               </h2>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground">
                 Laporan kendala, bug, dan pemeliharaan terbaru yang diajukan oleh klien.
               </p>
             </div>
@@ -86,14 +86,14 @@ export function AdminDashboardScreen() {
           ) : maintLogsQuery.data && maintLogsQuery.data.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[700px] border-collapse text-left text-xs">
-                <thead className="bg-secondary text-[10px] uppercase text-muted-foreground">
+                <thead className="bg-card text-[10px] uppercase text-muted-foreground">
                   <tr>
-                    <th className="border-b border-border px-4 py-3">Project</th>
-                    <th className="border-b border-border px-4 py-3">Deskripsi / Request</th>
-                    <th className="border-b border-border px-4 py-3">Tanggal Request</th>
-                    <th className="border-b border-border px-4 py-3 w-[120px]">Status</th>
-                    <th className="border-b border-border px-4 py-3">PIC</th>
-                    <th className="border-b border-border px-4 py-3 w-[100px] text-right">Aksi</th>
+                    <th className="border-b border-border/30 px-4 py-3">Project</th>
+                    <th className="border-b border-border/30 px-4 py-3">Deskripsi / Request</th>
+                    <th className="border-b border-border/30 px-4 py-3">Tanggal Request</th>
+                    <th className="border-b border-border/30 px-4 py-3 w-[120px]">Status</th>
+                    <th className="border-b border-border/30 px-4 py-3">PIC</th>
+                    <th className="border-b border-border/30 px-4 py-3 w-[100px] text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -102,16 +102,16 @@ export function AdminDashboardScreen() {
                       key={log.id}
                       className="align-middle hover:bg-secondary/40 transition-colors"
                     >
-                      <td className="border-b border-border px-4 py-3 font-semibold text-foreground">
+                      <td className="border-b border-border/30 px-4 py-3 font-semibold text-foreground">
                         {log.projectName || "GiLabs Project"}
                       </td>
-                      <td className="border-b border-border px-4 py-3 text-foreground font-medium max-w-[320px] truncate" title={log.description}>
+                      <td className="border-b border-border/30 px-4 py-3 text-foreground font-medium max-w-[320px] truncate" title={log.description}>
                         {log.description}
                       </td>
-                      <td className="border-b border-border px-4 py-3 text-muted-foreground">
+                      <td className="border-b border-border/30 px-4 py-3 text-muted-foreground">
                         {log.requestDate}
                       </td>
-                      <td className="border-b border-border px-4 py-3">
+                      <td className="border-b border-border/30 px-4 py-3">
                         <span
                           className={`inline-flex items-center rounded px-2 py-0.5 text-[9px] font-bold uppercase ${
                             log.status === "completed"
@@ -124,10 +124,10 @@ export function AdminDashboardScreen() {
                           {log.status === "in_progress" ? "In Progress" : log.status === "completed" ? "Selesai" : "Pending"}
                         </span>
                       </td>
-                      <td className="border-b border-border px-4 py-3 text-muted-foreground">
+                      <td className="border-b border-border/30 px-4 py-3 text-muted-foreground">
                         {log.picName || "-"}
                       </td>
-                      <td className="border-b border-border px-4 py-3 text-right">
+                      <td className="border-b border-border/30 px-4 py-3 text-right">
                         <div className="flex justify-end gap-1">
                           {log.status === "pending" && (
                             <button
@@ -139,7 +139,7 @@ export function AdminDashboardScreen() {
                                 })
                               }
                               title="Progres Maintenance"
-                              className="inline-flex h-7 w-7 items-center justify-center rounded border border-border text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer transition-colors"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded border border-border/60 bg-card text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer transition-colors"
                             >
                               <Play className="h-3.5 w-3.5" />
                             </button>
@@ -154,7 +154,7 @@ export function AdminDashboardScreen() {
                                 })
                               }
                               title="Selesaikan / Done"
-                              className="inline-flex h-7 w-7 items-center justify-center rounded border border-border text-muted-foreground hover:text-teal-600 hover:bg-secondary cursor-pointer transition-colors"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded border border-border/60 bg-card text-muted-foreground hover:text-teal-600 hover:bg-secondary cursor-pointer transition-colors"
                             >
                               <Check className="h-3.5 w-3.5" />
                             </button>
@@ -181,16 +181,12 @@ export function AdminDashboardScreen() {
         {/* Leads & Partners Overview Stack */}
         <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
           <section className="space-y-3">
-            <h2 className="text-xl font-extrabold tracking-tight text-foreground">Lead Terbaru</h2>
-            <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-              <LeadTable leads={dashboard.data?.recentLeads ?? []} showPartner role="admin" />
-            </div>
+            <h2 className="text-sm font-extrabold tracking-tight text-foreground uppercase tracking-wider text-muted-foreground">Lead Terbaru</h2>
+            <LeadTable leads={dashboard.data?.recentLeads ?? []} showPartner role="admin" />
           </section>
           <section className="space-y-3">
-            <h2 className="text-xl font-extrabold tracking-tight text-foreground">Performa Mitra</h2>
-            <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-              <PartnerStatsPanel />
-            </div>
+            <h2 className="text-sm font-extrabold tracking-tight text-foreground uppercase tracking-wider text-muted-foreground">Performa Mitra</h2>
+            <PartnerStatsPanel />
           </section>
         </div>
 

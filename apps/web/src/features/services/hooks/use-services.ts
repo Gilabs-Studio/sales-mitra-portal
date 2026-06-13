@@ -71,6 +71,7 @@ export function useServiceAdminForm() {
     onSuccess: () => {
       form.reset(defaultValues);
       setEditingService(null);
+      useServiceUIStore.getState().setIsFormOpen(false);
       void queryClient.invalidateQueries({ queryKey: ["services"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "services"] });
       void queryClient.invalidateQueries({ queryKey: ["admin"] });
@@ -82,7 +83,10 @@ export function useServiceAdminForm() {
     editingService,
     isLoading: mutation.isPending,
     errorMessage: mutation.error instanceof Error ? mutation.error.message : "",
-    onCancel: () => setEditingService(null),
+    onCancel: () => {
+      setEditingService(null);
+      useServiceUIStore.getState().setIsFormOpen(false);
+    },
     onSubmit: form.handleSubmit((values) => mutation.mutate(toServicePayload(values))),
   };
 }
