@@ -1,5 +1,6 @@
 import axios, { AxiosError } from "axios";
 import { clearAccessToken, getAccessToken } from "@/features/auth/utils/auth-storage";
+import { getPublicApiBaseUrl } from "@/lib/api-url";
 
 export type ApiErrorPayload = {
   code: string;
@@ -29,7 +30,7 @@ export class ApiClientError extends Error {
 }
 
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? "/api/v1",
+  baseURL: getPublicApiBaseUrl(),
   timeout: 15000,
 });
 

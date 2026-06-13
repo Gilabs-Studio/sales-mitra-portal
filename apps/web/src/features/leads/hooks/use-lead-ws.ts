@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getAccessToken } from "@/features/auth/utils/auth-storage";
+import { getWebSocketApiBaseUrl } from "@/lib/api-url";
 import type { LeadMessage } from "../types/lead.types";
 
 type WsEvent = {
@@ -11,23 +12,11 @@ type WsEvent = {
 };
 
 function buildWsUrl(leadId: string): string {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
+  const apiBase = getWebSocketApiBaseUrl();
   const token = getAccessToken();
 
-  // Convert http(s) → ws(s), or handle relative paths
-  let base = apiBase;
-  if (base.startsWith("/")) {
-    const loc = typeof window !== "undefined" ? window.location : null;
-    if (loc) {
-      const protocol = loc.protocol === "https:" ? "wss:" : "ws:";
-      base = `${protocol}//${loc.host}${base}`;
-    }
-  } else {
-    base = base.replace(/^https?/, (m) => (m === "https" ? "wss" : "ws"));
-  }
-
   // Use partner endpoint by default; the server's auth middleware verifies the token regardless
-  return `${base}/partner/leads/${leadId}/ws?token=${encodeURIComponent(token)}`;
+  return `${apiBase}/partner/leads/${leadId}/ws?token=${encodeURIComponent(token)}`;
 }
 
 /**

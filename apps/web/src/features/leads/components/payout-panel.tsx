@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Coins, Percent, TrendingUp, Upload, Calendar, Eye, X, Check, FileText } from "lucide-react";
 import { ApiClientError } from "@/lib/api-client";
+import { getPublicAssetOrigin } from "@/lib/api-url";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogOverlay } from "@/components/ui/dialog";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -117,9 +118,7 @@ export function PayoutPanel({ leadId, role }: PayoutPanelProps) {
     if (url.startsWith("http://") || url.startsWith("https://")) {
       return url;
     }
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8089";
-    const hostBase = apiBase.replace("/api/v1", "");
-    return `${hostBase}${url}`;
+    return `${getPublicAssetOrigin()}${url}`;
   };
 
   if (isLoading) {
