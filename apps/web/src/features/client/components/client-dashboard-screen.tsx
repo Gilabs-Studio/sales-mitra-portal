@@ -186,31 +186,28 @@ export function ClientDashboardScreen() {
 
   return (
     <AppShell user={auth.user}>
-      {/* ── Page Container ─────────────────────────────────────────────────── */}
-      <div className="mx-auto max-w-7xl space-y-8 px-6 py-8 font-sans text-foreground lg:px-10">
-        {/* ── Header ───────────────────────────────────────────────────────── */}
-        <div className="flex items-start justify-between gap-6">
+      <div className="mx-auto max-w-7xl space-y-6 px-0 py-1 font-sans text-foreground sm:space-y-8">
+        <div className="flex flex-col gap-4 border-b border-border/60 pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground sm:text-[11px]">
               Portal Klien GiLabs
             </p>
             <h1 className="text-3xl font-sans font-medium tracking-tight text-foreground lg:text-4xl">
               Halo, {auth.user.name}
             </h1>
-            <p className="max-w-2xl font-serif text-lg leading-7 text-muted-foreground mt-2">
+            <p className="mt-2 max-w-2xl font-serif text-base leading-7 text-muted-foreground sm:text-lg">
               Pusat pemantauan dan kendali project IT Anda.
             </p>
           </div>
           <button
             onClick={openReportModal}
             disabled={dashboard.isLoading || !data?.projects?.length}
-            className="hidden sm:inline-flex shrink-0 min-h-10 items-center justify-center rounded-lg bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0 transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
+            className="hidden shrink-0 min-h-10 items-center justify-center rounded-2xl bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40 disabled:transform-none sm:inline-flex"
           >
             Laporkan Kendala / Bug
           </button>
         </div>
 
-        {/* ── Stats Bar ────────────────────────────────────────────────────── */}
         {dashboard.isLoading ? (
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[...Array(4)].map((_, i) => (
@@ -247,15 +244,13 @@ export function ClientDashboardScreen() {
           </div>
         )}
 
-        {/* ── Main Content: 3 columns on desktop ──────────────────────────── */}
         {dashboard.isError ? (
           <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm font-semibold text-destructive">
             Gagal memuat data dashboard.
           </div>
         ) : (
           !dashboard.isLoading && (
-            <div className="grid gap-6 lg:grid-cols-3">
-              {/* ── Column 1: Projects ──────────────────────────────────────── */}
+            <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-sans font-semibold tracking-tight text-foreground">
@@ -274,7 +269,7 @@ export function ClientDashboardScreen() {
                       <Link
                         key={p.id}
                         href={`/client/projects/${p.id}`}
-                        className="block rounded-lg border border-border bg-card p-4 hover:bg-secondary/40 hover:border-primary/30 transition-all cursor-pointer group"
+                        className="group block rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:bg-secondary/40"
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                            <h3 className="text-sm font-sans font-semibold text-foreground tracking-tight leading-snug group-hover:text-primary transition-colors line-clamp-1">
@@ -301,19 +296,17 @@ export function ClientDashboardScreen() {
                     </div>
                   )}
                 </div>
-                {/* Mobile report button */}
                 <button
                   onClick={openReportModal}
                   disabled={!data?.projects?.length}
-                   className="sm:hidden mt-2 inline-flex w-full min-h-10 items-center justify-center rounded-lg bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 transition-all cursor-pointer disabled:opacity-40"
+                  className="mt-1 inline-flex min-h-10 w-full items-center justify-center rounded-2xl bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground transition-all hover:opacity-90 disabled:opacity-40 sm:hidden"
                 >
                   Laporkan Kendala / Bug
                 </button>
               </div>
 
-              {/* ── Column 2: Maintenance ───────────────────────────────────── */}
               <div className="flex flex-col gap-4">
-                 <h2 className="text-base font-sans font-semibold tracking-tight text-foreground">
+                <h2 className="text-base font-sans font-semibold tracking-tight text-foreground">
                   Maintenance Aktif
                 </h2>
                 <div className="flex flex-col gap-3">
@@ -330,7 +323,7 @@ export function ClientDashboardScreen() {
                       return (
                         <div
                           key={m.id}
-                          className="rounded-lg border border-border bg-card p-4 space-y-3"
+                          className="space-y-3 rounded-2xl border border-border bg-card p-4"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
@@ -381,10 +374,9 @@ export function ClientDashboardScreen() {
                 </div>
               </div>
 
-              {/* ── Column 3: Recent Activity ───────────────────────────────── */}
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                   <h2 className="text-base font-sans font-semibold tracking-tight text-foreground">
+                  <h2 className="text-base font-sans font-semibold tracking-tight text-foreground">
                     Aktivitas Terbaru
                   </h2>
                   {notificationsQuery.data &&
@@ -420,7 +412,7 @@ export function ClientDashboardScreen() {
                         return (
                           <div
                             key={notification.id}
-                            className="rounded-lg border border-border bg-card px-4 py-3 space-y-1 hover:bg-secondary/30 transition-colors"
+                            className="space-y-1 rounded-2xl border border-border bg-card px-4 py-3 transition-colors hover:bg-secondary/30"
                           >
                             <div className="flex items-center justify-between gap-2">
                               <span
@@ -460,7 +452,6 @@ export function ClientDashboardScreen() {
         )}
       </div>
 
-      {/* ── Report Modal ───────────────────────────────────────────────────── */}
       {isReportOpen && data?.projects && data.projects.length > 0 && (
         <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
           <DialogOverlay className="bg-foreground/20" />

@@ -22,19 +22,21 @@ export function PartnerDashboardScreen() {
 
   return (
     <AppShell user={auth.user}>
-      <div className="space-y-6">
-        <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <div className="space-y-5 sm:space-y-6">
+        <section className="flex flex-col gap-4 border-b border-border/60 pb-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase text-muted-foreground">Mitra workspace</p>
-            <h1 className="mt-2 text-3xl font-sans font-medium tracking-tight text-foreground">Pipeline komisi project IT Anda</h1>
-            <p className="mt-2 max-w-2xl font-serif text-lg leading-7 text-muted-foreground">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground sm:text-sm">Mitra workspace</p>
+            <h1 className="mt-2 max-w-3xl text-3xl font-sans font-medium tracking-tight text-foreground sm:text-4xl">
+              Pipeline komisi project IT Anda
+            </h1>
+            <p className="mt-2 max-w-2xl font-serif text-base leading-7 text-muted-foreground sm:text-lg">
               Submit lead, pantau status, dan gunakan referral code untuk membuka peluang passive income dari jaringan Anda
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid w-full gap-2 md:w-auto">
             <button
               onClick={modal.open}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0 cursor-pointer shadow"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0"
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
               Submit lead
@@ -43,7 +45,7 @@ export function PartnerDashboardScreen() {
         </section>
         {dashboard.isError ? <p className="text-sm font-semibold text-destructive">Dashboard gagal dimuat</p> : null}
         <MetricGrid metrics={dashboard.data?.summary ?? []} />
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
           <BreakdownGrid title="Status lead" items={dashboard.data?.statusBreakdown ?? []} />
           <BreakdownGrid title="Layanan" items={dashboard.data?.serviceBreakdown ?? []} />
         </div>

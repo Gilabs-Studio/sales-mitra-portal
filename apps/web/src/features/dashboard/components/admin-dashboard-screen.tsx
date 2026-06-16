@@ -24,51 +24,47 @@ export function AdminDashboardScreen() {
 
   return (
     <AppShell user={auth.user}>
-      <div className="space-y-12 py-4 px-1 font-sans text-foreground">
-        
-        {/* Command Center Title Section */}
-        <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-6 border-b border-border/60">
+      <div className="space-y-7 px-0.5 py-1 font-sans text-foreground sm:space-y-10">
+        <section className="flex flex-col gap-4 border-b border-border/60 pb-5 md:flex-row md:items-center md:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-primary">
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary sm:text-xs">
               Admin Command Center
             </p>
-            <h1 className="text-4xl font-sans font-medium tracking-tight text-foreground md:text-5xl">
+            <h1 className="max-w-3xl text-3xl font-sans font-medium tracking-tight text-foreground sm:text-4xl md:text-5xl">
               Portal Management GiLabs
             </h1>
-            <p className="max-w-2xl font-serif text-lg leading-7 text-muted-foreground mt-2">
+            <p className="max-w-2xl font-serif text-base leading-7 text-muted-foreground sm:text-lg">
               Pantau prospek dari mitra sales, tangani pengerjaan maintenance klien, dan kelola ekosistem portal.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 pt-2 md:pt-0">
+          <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:flex-wrap md:pt-0">
             <Link
               href="/admin/leads"
-              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 sm:text-xs"
             >
               Kelola Lead
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
             <Link
               href="/admin/services"
-              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2 text-xs font-bold text-foreground transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-border bg-secondary px-4 py-2 text-[11px] font-bold text-foreground transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 sm:text-xs"
             >
               <Settings2 className="h-3.5 w-3.5" />
-              CRUD Layanan
+              Layanan
             </Link>
           </div>
         </section>
 
-        {/* Quick Metrics */}
         {dashboard.isLoading ? (
           <div className="h-24 animate-pulse rounded-lg bg-muted" />
         ) : (
           <MetricGrid metrics={dashboard.data?.summary ?? []} />
         )}
 
-        {/* Client Maintenance Requests Section */}
-        <section className="rounded-lg bg-secondary/45 p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-border/30 pb-3">
+        <section className="space-y-4 rounded-2xl border border-border/40 bg-secondary/45 p-4 sm:p-5">
+          <div className="flex flex-col gap-3 border-b border-border/30 pb-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <h2 className="text-sm font-sans font-semibold text-foreground flex items-center gap-2">
+              <h2 className="flex items-center gap-2 text-sm font-sans font-semibold text-foreground">
                 <Wrench className="h-4 w-4 text-primary" />
                 Request Maintenance Klien
               </h2>
@@ -76,7 +72,7 @@ export function AdminDashboardScreen() {
                 Laporan kendala, bug, dan pemeliharaan terbaru yang diajukan oleh klien.
               </p>
             </div>
-            <span className="rounded bg-teal-500/10 px-2 py-0.5 text-[10px] font-bold text-teal-600">
+            <span className="w-fit rounded-full bg-teal-500/10 px-2.5 py-1 text-[10px] font-bold text-teal-600">
               {maintLogsQuery.data?.filter((log) => log.status !== "completed").length ?? 0} Aktif
             </span>
           </div>
@@ -178,8 +174,7 @@ export function AdminDashboardScreen() {
           )}
         </section>
 
-        {/* Leads & Partners Overview Stack */}
-        <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+        <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:gap-8">
           <section className="space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground font-sans">Lead Terbaru</h2>
             <LeadTable leads={dashboard.data?.recentLeads ?? []} showPartner role="admin" />
