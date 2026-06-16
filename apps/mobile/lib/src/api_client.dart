@@ -142,6 +142,37 @@ class ApiClient {
         .toList();
   }
 
+  Future<List<AdminClient>> adminClients() async {
+    final data = await _request(
+      'GET',
+      '/admin/clients',
+      query: {'pageSize': '60'},
+    );
+    final items = (data as Map<String, dynamic>)['data'] as List? ?? [];
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(AdminClient.fromJson)
+        .toList();
+  }
+
+  Future<ClientMonitoringDetail> adminClientDetail(String clientId) async {
+    final data = await _request('GET', '/admin/clients/$clientId');
+    return ClientMonitoringDetail.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<AdminProjectDetail> adminProjectDetail(String projectId) async {
+    final data = await _request('GET', '/admin/projects/$projectId');
+    return AdminProjectDetail.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<List<MaintenanceRequestLog>> adminMaintenanceLogs() async {
+    final data = await _request('GET', '/admin/maintenance-logs');
+    return (data as List)
+        .whereType<Map<String, dynamic>>()
+        .map(MaintenanceRequestLog.fromJson)
+        .toList();
+  }
+
   Future<String> askChatbot(String question) async {
     final data = await _request(
       'POST',

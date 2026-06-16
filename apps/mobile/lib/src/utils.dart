@@ -94,3 +94,23 @@ Color statusColor(LeadStatus status) {
     LeadStatus.rejected => MitraColors.destructive,
   };
 }
+
+Color projectStatusColor(ProjectStatus status) {
+  return switch (status) {
+    ProjectStatus.discovery => MitraColors.mutedForeground,
+    ProjectStatus.planning => MitraColors.warning,
+    ProjectStatus.development => MitraColors.accent,
+    ProjectStatus.testing => MitraColors.warning,
+    ProjectStatus.deployment => MitraColors.foreground,
+    ProjectStatus.completed => MitraColors.success,
+    ProjectStatus.maintenance => MitraColors.success,
+  };
+}
+
+Color progressStatusColor(ProgressStatus status) {
+  return switch (status) {
+    ProgressStatus.pending => MitraColors.destructive,
+    ProgressStatus.inProgress => MitraColors.warning,
+    ProgressStatus.completed => MitraColors.success,
+  };
+}

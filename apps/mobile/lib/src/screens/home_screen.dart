@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../models.dart';
 import '../theme.dart';
 import 'add_lead_sheet.dart';
+import 'admin_monitor_screen.dart';
 import 'chat_list_screen.dart';
 import 'knowledge_screen.dart';
 import 'profile_screen.dart';
@@ -20,19 +22,24 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final state = StateScope.of(context);
+    final isAdmin = isAdminRole(state.role);
+    final pages = isAdmin
+        ? const [
+            AdminMonitorScreen(),
+            ChatListScreen(),
+            KnowledgeScreen(),
+            ProfileScreen(),
+          ]
+        : const [ChatListScreen(), KnowledgeScreen(), ProfileScreen()];
+
+    final currentIndex = index >= pages.length ? 0 : index;
+
     return AnimatedBuilder(
       animation: state,
       builder: (context, _) {
         return Scaffold(
-          body: IndexedStack(
-            index: index,
-            children: const [
-              ChatListScreen(),
-              KnowledgeScreen(),
-              ProfileScreen(),
-            ],
-          ),
-          floatingActionButton: index == 0
+          body: IndexedStack(index: currentIndex, children: pages),
+          floatingActionButton: !isAdmin && currentIndex == 0
               ? FloatingActionButton.small(
                   heroTag: 'home-add-lead-fab',
                   elevation: 1,
@@ -63,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             child: BottomNavigationBar(
-              currentIndex: index,
+              currentIndex: currentIndex,
               onTap: (value) => setState(() => index = value),
               elevation: 0,
               iconSize: 22,
@@ -71,6 +78,11 @@ class _HomeScreenState extends State<HomeScreen> {
               unselectedFontSize: 11,
               type: BottomNavigationBarType.fixed,
               items: [
+                if (isAdmin)
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.monitor_outlined),
+                    label: 'Monitor',
+                  ),
                 BottomNavigationBarItem(
                   icon: Stack(
                     clipBehavior: Clip.none,
