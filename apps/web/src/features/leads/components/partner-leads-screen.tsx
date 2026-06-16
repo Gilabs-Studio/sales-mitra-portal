@@ -28,14 +28,14 @@ export function PartnerLeadsScreen() {
       <div className="space-y-6">
         <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-extrabold text-foreground">Lead Anda</h1>
+            <h1 className="text-3xl font-sans font-medium tracking-tight text-foreground">Lead Anda</h1>
             <p className="mt-2 font-serif text-lg leading-7 text-muted-foreground">
               Semua prospek tersimpan dengan hasil kualifikasi otomatis dan tracking yang transparan
             </p>
           </div>
           <button
             onClick={modal.open}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-extrabold text-primary-foreground hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0 transition-all duration-300 cursor-pointer shrink-0"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0 transition-all duration-300 cursor-pointer shrink-0"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             Submit lead baru

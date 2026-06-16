@@ -23,7 +23,7 @@ export function AdminLeadsScreen() {
     <AppShell user={auth.user}>
       <section className="space-y-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-foreground">Review lead mitra</h1>
+          <h1 className="text-3xl font-sans font-medium tracking-tight text-foreground">Review lead mitra</h1>
           <p className="mt-2 max-w-2xl font-serif text-lg leading-7 text-muted-foreground">
             Update status pipeline dari satu layar dengan endpoint JOIN agar data mitra tidak diambil satu per satu
           </p>

@@ -130,7 +130,7 @@ export function ClientDetailScreen({ clientId }: { readonly clientId: string }) 
             <span className="text-xs font-bold uppercase tracking-wider text-primary">
               Detail Klien Portal
             </span>
-            <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
+            <h1 className="text-2xl font-sans font-medium tracking-tight text-foreground">
               {client?.name}
             </h1>
           </div>
@@ -147,7 +147,7 @@ export function ClientDetailScreen({ clientId }: { readonly clientId: string }) 
             {/* Projects Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-extrabold text-foreground flex items-center gap-2">
+                <h2 className="text-lg font-sans font-semibold tracking-tight text-foreground flex items-center gap-2">
                   <FolderKanban className="h-4 w-4 text-primary" />
                   Daftar Project Terdaftar
                 </h2>
@@ -184,7 +184,7 @@ export function ClientDetailScreen({ clientId }: { readonly clientId: string }) 
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
-                        <h3 className="mt-2 text-sm font-extrabold text-foreground line-clamp-1">
+                        <h3 className="mt-2 text-sm font-sans font-semibold text-foreground line-clamp-1">
                           {p.name}
                         </h3>
                         <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">
@@ -209,7 +209,7 @@ export function ClientDetailScreen({ clientId }: { readonly clientId: string }) 
 
             {/* Client Info Summary */}
             <aside className="rounded-lg border border-border bg-card p-5 h-fit space-y-4">
-              <h3 className="text-sm font-extrabold text-foreground uppercase tracking-wider text-muted-foreground">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground font-sans">
                 Informasi Kontak Klien
               </h3>
               <div className="space-y-3">

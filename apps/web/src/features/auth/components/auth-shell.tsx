@@ -24,7 +24,7 @@ export function AuthShell({ title, description, children }: AuthShellProps) {
           </Link>
           <div className="max-w-2xl py-12">
             <p className="text-sm font-semibold uppercase text-muted-foreground">Partner ecosystem</p>
-            <h1 className="mt-4 max-w-xl text-5xl font-bold leading-[1.05] text-foreground md:text-6xl">
+            <h1 className="mt-4 max-w-xl text-5xl font-sans font-medium tracking-tight leading-[1.05] text-foreground md:text-6xl">
               Kemitraan IT untuk komisi project yang lebih transparan
             </h1>
             <p className="mt-6 max-w-xl font-serif text-xl leading-8 text-muted-foreground">
@@ -37,7 +37,7 @@ export function AuthShell({ title, description, children }: AuthShellProps) {
         </section>
         <section className="flex items-center">
           <div className="w-full rounded-lg border border-border bg-card p-5">
-            <h2 className="text-2xl font-extrabold text-foreground">{title}</h2>
+            <h2 className="text-2xl font-sans font-semibold tracking-tight text-foreground">{title}</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
             <div className="mt-6">{children}</div>
           </div>

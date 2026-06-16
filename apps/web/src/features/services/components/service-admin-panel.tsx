@@ -41,7 +41,7 @@ export function ServiceAdminPanel() {
       {/* List Header Section */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-extrabold text-foreground">Daftar Layanan Aktif</h2>
+          <h2 className="text-xl font-sans font-medium tracking-tight text-foreground">Daftar Layanan Aktif</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             Menampilkan total {services.data?.length ?? 0} layanan dalam katalog sistem.
           </p>
@@ -76,7 +76,7 @@ export function ServiceAdminPanel() {
             <div>
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-extrabold text-base text-foreground leading-snug truncate" title={service.label}>
+                  <h3 className="font-sans font-semibold text-base text-foreground leading-snug truncate" title={service.label}>
                     {service.label}
                   </h3>
                   <code className="text-[9px] font-mono font-bold text-primary/60 uppercase tracking-wider bg-secondary px-1.5 py-0.5 rounded mt-1 inline-block">

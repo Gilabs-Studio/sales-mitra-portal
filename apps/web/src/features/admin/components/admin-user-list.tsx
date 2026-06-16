@@ -13,7 +13,7 @@ export function AdminUserList() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold uppercase text-muted-foreground">Akses internal</p>
-          <h2 className="mt-1 text-2xl font-extrabold text-foreground">Admin terdaftar</h2>
+          <h2 className="mt-1 text-2xl font-sans font-medium tracking-tight text-foreground">Admin terdaftar</h2>
         </div>
         <div className="rounded-full border border-border bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
           {admins.data?.length ?? 0} akun
@@ -59,7 +59,7 @@ function AdminUserCard({ admin }: { admin: AdminUser }) {
             ) : (
               <Shield className="h-4 w-4 text-foreground" aria-hidden="true" />
             )}
-            <p className="font-extrabold text-foreground">{admin.name}</p>
+            <p className="font-semibold text-foreground">{admin.name}</p>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{admin.email}</p>
           <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

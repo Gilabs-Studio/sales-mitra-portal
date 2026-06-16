@@ -25,7 +25,7 @@ export function KnowledgeScreen() {
       <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
         <section className="space-y-4">
           <div>
-            <h1 className="text-3xl font-extrabold text-foreground">Product knowledge center</h1>
+            <h1 className="text-3xl font-sans font-medium tracking-tight text-foreground">Product knowledge center</h1>
             <p className="mt-2 max-w-2xl font-serif text-lg leading-7 text-muted-foreground">
               Materi sales untuk menjelaskan layanan, SOP development, discovery, kualitas delivery, dan angle closing.
             </p>
@@ -38,7 +38,7 @@ export function KnowledgeScreen() {
                 className="rounded-lg border border-border bg-card p-5 text-left transition-colors hover:bg-secondary/25"
               >
                 <p className="text-xs font-semibold uppercase text-muted-foreground">{article.category}</p>
-                <h2 className="mt-2 text-xl font-extrabold text-foreground">{article.title}</h2>
+                <h2 className="mt-2 text-xl font-sans font-semibold text-foreground">{article.title}</h2>
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">{article.content}</p>
                 <p className="mt-4 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-foreground">
                   Buka detail
@@ -51,7 +51,7 @@ export function KnowledgeScreen() {
         <aside className="rounded-lg border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5" aria-hidden="true" />
-            <h2 className="text-lg font-extrabold text-foreground">AI chatbot mitra</h2>
+            <h2 className="text-lg font-sans font-semibold text-foreground">AI chatbot mitra</h2>
           </div>
           <div className="mt-4 h-[420px] space-y-3 overflow-y-auto rounded-lg border border-border bg-secondary p-3">
             {chatbot.messages.map((message) => (

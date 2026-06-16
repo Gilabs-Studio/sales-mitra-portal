@@ -22,10 +22,10 @@ export function ClientProjectList() {
     <AppShell user={auth.user}>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-extrabold text-foreground tracking-tight">
+          <h1 className="text-3xl font-sans font-medium tracking-tight text-foreground">
             {t("projectTitle")}
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 max-w-2xl font-serif text-lg leading-7 text-muted-foreground">
             Daftar seluruh project aktif dan histori project Anda bersama GiLabs.
           </p>
         </div>
@@ -88,7 +88,7 @@ export function ClientProjectList() {
                       <td className="border-b border-border px-4 py-3">
                         <Link
                           href={`/client/projects/${p.id}`}
-                          className="inline-flex items-center text-xs font-extrabold text-primary hover:underline cursor-pointer"
+                          className="inline-flex items-center text-xs font-semibold text-primary hover:underline cursor-pointer"
                         >
                           Buka
                         </Link>

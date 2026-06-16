@@ -20,8 +20,8 @@ export function AdminManagementScreen() {
       <div className="space-y-6">
         <div>
           <p className="text-sm font-semibold uppercase text-muted-foreground">Super admin workspace</p>
-          <h1 className="mt-2 text-4xl font-extrabold text-foreground">Kelola admin portal</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+          <h1 className="mt-2 text-4xl font-sans font-medium tracking-tight text-foreground">Kelola admin portal</h1>
+          <p className="mt-3 max-w-2xl font-serif text-lg leading-7 text-muted-foreground">
             Tambahkan akun admin baru dan pantau siapa saja yang saat ini punya akses ke area admin.
           </p>
         </div>
@@ -31,7 +31,7 @@ export function AdminManagementScreen() {
             <div className="flex items-start gap-3">
               <ShieldAlert className="mt-0.5 h-5 w-5 text-destructive" aria-hidden="true" />
               <div>
-                <h2 className="text-lg font-extrabold text-foreground">Akses dibatasi</h2>
+                <h2 className="text-lg font-sans font-semibold tracking-tight text-foreground">Akses dibatasi</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
                   Halaman ini hanya bisa digunakan oleh super admin. Admin biasa tetap dapat memakai seluruh fitur admin lain seperti lead, chat, dan layanan.
                 </p>

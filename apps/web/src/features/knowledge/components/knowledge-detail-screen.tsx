@@ -35,7 +35,7 @@ export function KnowledgeDetailScreen({ articleId }: KnowledgeDetailScreenProps)
           </Link>
           <div>
             <p className="text-xs font-semibold uppercase text-muted-foreground">Knowledge detail</p>
-            <h1 className="text-3xl font-extrabold text-foreground">
+            <h1 className="text-3xl font-sans font-medium tracking-tight text-foreground">
               {article?.title ?? "Detail knowledge"}
             </h1>
           </div>
@@ -71,7 +71,7 @@ function KnowledgeDetailBody({ article }: { article: KnowledgeArticle }) {
         {detail?.sections.map((section) => (
           <section key={section.title} className="space-y-3">
             <div>
-              <h2 className="text-lg font-extrabold text-foreground">{section.title}</h2>
+              <h2 className="text-lg font-sans font-semibold tracking-tight text-foreground">{section.title}</h2>
               {section.summary ? (
                 <p className="mt-1 text-sm text-muted-foreground">{section.summary}</p>
               ) : null}
@@ -83,7 +83,7 @@ function KnowledgeDetailBody({ article }: { article: KnowledgeArticle }) {
                   key={item.title}
                   className="rounded-lg border border-border bg-background px-4 py-3"
                 >
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-bold text-foreground">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-foreground font-sans">
                     <span>{item.title}</span>
                     <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                   </summary>

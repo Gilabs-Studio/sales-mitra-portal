@@ -61,7 +61,7 @@ export function ClientManagementScreen() {
     setCreateOpen(true);
   };
 
-  const handleCreateClient = (e: React.FormEvent) => {
+  const handleCreateClient = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError("");
     setSuccessMsg("");
@@ -135,10 +135,10 @@ export function ClientManagementScreen() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-extrabold text-foreground tracking-tight">
+            <h1 className="text-3xl font-sans font-medium tracking-tight text-foreground">
               Manajemen Klien Portal
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="mt-2 max-w-2xl font-serif text-lg leading-7 text-muted-foreground">
               Kelola akun klien, hubungkan dengan project IT, dan kirim kredensial akses login.
             </p>
           </div>

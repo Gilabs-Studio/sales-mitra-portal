@@ -32,10 +32,10 @@ export function AdminDashboardScreen() {
             <p className="text-xs font-bold uppercase tracking-wider text-primary">
               Admin Command Center
             </p>
-            <h1 className="text-4xl font-extrabold tracking-tight text-foreground md:text-5xl">
+            <h1 className="text-4xl font-sans font-medium tracking-tight text-foreground md:text-5xl">
               Portal Management GiLabs
             </h1>
-            <p className="max-w-2xl text-sm text-muted-foreground leading-relaxed">
+            <p className="max-w-2xl font-serif text-lg leading-7 text-muted-foreground mt-2">
               Pantau prospek dari mitra sales, tangani pengerjaan maintenance klien, dan kelola ekosistem portal.
             </p>
           </div>
@@ -68,7 +68,7 @@ export function AdminDashboardScreen() {
         <section className="rounded-lg bg-secondary/45 p-5 space-y-4">
           <div className="flex items-center justify-between border-b border-border/30 pb-3">
             <div className="space-y-1">
-              <h2 className="text-sm font-extrabold text-foreground flex items-center gap-2">
+              <h2 className="text-sm font-sans font-semibold text-foreground flex items-center gap-2">
                 <Wrench className="h-4 w-4 text-primary" />
                 Request Maintenance Klien
               </h2>
@@ -181,11 +181,11 @@ export function AdminDashboardScreen() {
         {/* Leads & Partners Overview Stack */}
         <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
           <section className="space-y-3">
-            <h2 className="text-sm font-extrabold tracking-tight text-foreground uppercase tracking-wider text-muted-foreground">Lead Terbaru</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground font-sans">Lead Terbaru</h2>
             <LeadTable leads={dashboard.data?.recentLeads ?? []} showPartner role="admin" />
           </section>
           <section className="space-y-3">
-            <h2 className="text-sm font-extrabold tracking-tight text-foreground uppercase tracking-wider text-muted-foreground">Performa Mitra</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground font-sans">Performa Mitra</h2>
             <PartnerStatsPanel />
           </section>
         </div>

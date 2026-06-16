@@ -26,7 +26,7 @@ export function PartnerDashboardScreen() {
         <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase text-muted-foreground">Mitra workspace</p>
-            <h1 className="mt-2 text-3xl font-extrabold text-foreground">Pipeline komisi project IT Anda</h1>
+            <h1 className="mt-2 text-3xl font-sans font-medium tracking-tight text-foreground">Pipeline komisi project IT Anda</h1>
             <p className="mt-2 max-w-2xl font-serif text-lg leading-7 text-muted-foreground">
               Submit lead, pantau status, dan gunakan referral code untuk membuka peluang passive income dari jaringan Anda
             </p>
@@ -34,7 +34,7 @@ export function PartnerDashboardScreen() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={modal.open}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-extrabold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0 cursor-pointer shadow"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0 cursor-pointer shadow"
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
               Submit lead
@@ -49,7 +49,7 @@ export function PartnerDashboardScreen() {
         </div>
         <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
           <section className="space-y-3">
-            <h2 className="text-sm font-extrabold tracking-tight text-foreground uppercase tracking-wider text-muted-foreground">Lead terbaru</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground font-sans">Lead terbaru</h2>
             <LeadTable leads={dashboard.data?.recentLeads ?? []} />
           </section>
           <ReferralList referrals={dashboard.data?.referrals ?? []} />

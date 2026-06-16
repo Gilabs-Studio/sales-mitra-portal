@@ -107,7 +107,7 @@ function StatCard({
         {label}
       </p>
       <p
-        className={`text-3xl font-extrabold tracking-tight truncate ${accent ?? "text-foreground"}`}
+        className={`text-3xl font-sans font-semibold tracking-tight truncate ${accent ?? "text-foreground"}`}
       >
         {value}
       </p>
@@ -187,24 +187,24 @@ export function ClientDashboardScreen() {
   return (
     <AppShell user={auth.user}>
       {/* ── Page Container ─────────────────────────────────────────────────── */}
-      <div className="mx-auto max-w-screen-xl space-y-8 px-6 py-8 font-sans text-foreground lg:px-10">
+      <div className="mx-auto max-w-7xl space-y-8 px-6 py-8 font-sans text-foreground lg:px-10">
         {/* ── Header ───────────────────────────────────────────────────────── */}
         <div className="flex items-start justify-between gap-6">
           <div className="space-y-1">
             <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
               Portal Klien GiLabs
             </p>
-            <h1 className="text-3xl font-extrabold tracking-tight text-foreground lg:text-4xl">
+            <h1 className="text-3xl font-sans font-medium tracking-tight text-foreground lg:text-4xl">
               Halo, {auth.user.name}
             </h1>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="max-w-2xl font-serif text-lg leading-7 text-muted-foreground mt-2">
               Pusat pemantauan dan kendali project IT Anda.
             </p>
           </div>
           <button
             onClick={openReportModal}
             disabled={dashboard.isLoading || !data?.projects?.length}
-            className="hidden sm:inline-flex shrink-0 min-h-10 items-center justify-center rounded-lg bg-primary px-5 py-2 text-xs font-extrabold text-primary-foreground hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0 transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
+            className="hidden sm:inline-flex shrink-0 min-h-10 items-center justify-center rounded-lg bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0 transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
           >
             Laporkan Kendala / Bug
           </button>
@@ -258,7 +258,7 @@ export function ClientDashboardScreen() {
               {/* ── Column 1: Projects ──────────────────────────────────────── */}
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-extrabold tracking-tight text-foreground">
+                  <h2 className="text-base font-sans font-semibold tracking-tight text-foreground">
                     Project Saya
                   </h2>
                   <Link
@@ -277,7 +277,7 @@ export function ClientDashboardScreen() {
                         className="block rounded-lg border border-border bg-card p-4 hover:bg-secondary/40 hover:border-primary/30 transition-all cursor-pointer group"
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <h3 className="text-sm font-extrabold text-foreground tracking-tight leading-snug group-hover:text-primary transition-colors line-clamp-1">
+                           <h3 className="text-sm font-sans font-semibold text-foreground tracking-tight leading-snug group-hover:text-primary transition-colors line-clamp-1">
                             {p.name}
                           </h3>
                           <StatusBadge status={p.status} />
@@ -305,7 +305,7 @@ export function ClientDashboardScreen() {
                 <button
                   onClick={openReportModal}
                   disabled={!data?.projects?.length}
-                  className="sm:hidden mt-2 inline-flex w-full min-h-10 items-center justify-center rounded-lg bg-primary px-5 py-2 text-xs font-extrabold text-primary-foreground hover:opacity-90 transition-all cursor-pointer disabled:opacity-40"
+                   className="sm:hidden mt-2 inline-flex w-full min-h-10 items-center justify-center rounded-lg bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 transition-all cursor-pointer disabled:opacity-40"
                 >
                   Laporkan Kendala / Bug
                 </button>
@@ -313,7 +313,7 @@ export function ClientDashboardScreen() {
 
               {/* ── Column 2: Maintenance ───────────────────────────────────── */}
               <div className="flex flex-col gap-4">
-                <h2 className="text-base font-extrabold tracking-tight text-foreground">
+                 <h2 className="text-base font-sans font-semibold tracking-tight text-foreground">
                   Maintenance Aktif
                 </h2>
                 <div className="flex flex-col gap-3">
@@ -337,7 +337,7 @@ export function ClientDashboardScreen() {
                               <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground truncate">
                                 {proj?.name ?? "—"}
                               </p>
-                              <p className="text-sm font-extrabold text-foreground mt-0.5 truncate">
+                              <p className="text-sm font-semibold text-foreground mt-0.5 truncate">
                                 {m.packageName}
                               </p>
                             </div>
@@ -384,7 +384,7 @@ export function ClientDashboardScreen() {
               {/* ── Column 3: Recent Activity ───────────────────────────────── */}
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-extrabold tracking-tight text-foreground">
+                   <h2 className="text-base font-sans font-semibold tracking-tight text-foreground">
                     Aktivitas Terbaru
                   </h2>
                   {notificationsQuery.data &&

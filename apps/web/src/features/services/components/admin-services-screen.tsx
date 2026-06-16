@@ -16,8 +16,8 @@ export function AdminServicesScreen() {
       <div className="space-y-6">
         <div>
           <p className="text-sm font-semibold uppercase text-muted-foreground">Admin workspace</p>
-          <h1 className="mt-2 text-4xl font-extrabold text-foreground">Service catalog</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+          <h1 className="mt-2 text-4xl font-sans font-medium tracking-tight text-foreground">Service catalog</h1>
+          <p className="mt-3 max-w-2xl font-serif text-lg leading-7 text-muted-foreground">
             Kelola layanan, budget minimum, dan rule discovery supaya lead mitra masuk dengan kualifikasi yang jelas
           </p>
         </div>

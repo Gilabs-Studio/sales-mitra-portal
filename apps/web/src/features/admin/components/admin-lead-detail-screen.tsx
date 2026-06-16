@@ -353,7 +353,7 @@ export function AdminLeadDetailScreen({ leadId }: AdminLeadDetailScreenProps) {
                             Score: {l.qualificationScore}
                           </span>
                         </div>
-                        <h2 className="text-lg font-extrabold text-foreground leading-snug">{l.companyName}</h2>
+                        <h2 className="text-lg font-sans font-semibold text-foreground leading-snug">{l.companyName}</h2>
                         <div className="text-xs text-muted-foreground space-y-1">
                           <div>Mitra: <span className="font-semibold text-foreground">{l.partnerName} ({l.partnerCode})</span></div>
                           <div>Budget: <span className="font-semibold text-foreground">{l.budget > 0 ? formatCurrency(l.budget) : "Discovery"}</span></div>

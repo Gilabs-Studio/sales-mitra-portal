@@ -41,8 +41,8 @@ export function PartnerManagementScreen() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase text-muted-foreground">Console Admin</p>
-            <h1 className="mt-2 text-4xl font-extrabold text-foreground">Daftar Mitra Portal</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+            <h1 className="mt-2 text-4xl font-sans font-medium tracking-tight text-foreground">Daftar Mitra Portal</h1>
+            <p className="mt-3 max-w-2xl font-serif text-lg leading-7 text-muted-foreground">
               Lihat performa pipeline lead, statistik won/rejected, dan kelola status akun dari setiap mitra sales.
             </p>
           </div>

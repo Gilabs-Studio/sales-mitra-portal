@@ -127,7 +127,7 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
               <span className="text-xs font-bold uppercase tracking-wider text-primary">
                 {project?.status}
               </span>
-              <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
+              <h1 className="text-2xl font-sans font-medium tracking-tight text-foreground">
                 {project?.name}
               </h1>
             </div>
@@ -211,7 +211,7 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
             <aside className="space-y-6">
               {/* Project Info Panel */}
               <div className="rounded-lg border border-border bg-card p-5">
-                <h3 className="text-sm font-extrabold text-foreground uppercase tracking-wider text-muted-foreground mb-4">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground font-sans mb-4">
                   Metadata Project
                 </h3>
                 <div className="space-y-4">
@@ -237,7 +237,7 @@ export function ClientProjectDetail({ projectId }: { readonly projectId: string 
 
               {/* Description Panel */}
               <div className="rounded-lg border border-border bg-card p-5">
-                <h3 className="text-sm font-extrabold text-foreground mb-2">
+                <h3 className="text-sm font-sans font-semibold text-foreground mb-2">
                   Deskripsi Proyek
                 </h3>
                 <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">

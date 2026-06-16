@@ -22,7 +22,7 @@ export function LeadTable<TLead extends Lead | LeadWithPartner>({
 }: LeadTableProps<TLead>) {
   if (leads.length === 0) {
     return (
-      <div className="rounded-lg border border-border bg-card p-6 text-sm leading-6 text-muted-foreground">
+      <div className="rounded-lg border border-border bg-card p-6 text-sm leading-6 text-muted-foreground font-sans">
         Belum ada lead untuk filter ini
       </div>
     );

@@ -467,7 +467,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
             <span className="text-xs font-bold uppercase tracking-wider text-primary">
               Kelola Detail Project
             </span>
-            <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
+            <h1 className="text-2xl font-sans font-medium tracking-tight text-foreground">
               {data?.project?.name}
             </h1>
           </div>
@@ -515,7 +515,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
               {activeTab === "info" && (
                 <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
                   <form onSubmit={handleUpdateInfo} className="space-y-4">
-                    <h2 className="text-lg font-extrabold text-foreground flex items-center gap-2 pb-2 border-b border-border/60">
+                    <h2 className="text-lg font-sans font-semibold tracking-tight text-foreground flex items-center gap-2 pb-2 border-b border-border/60">
                       Edit Informasi Metadata Project
                     </h2>
                     <FieldGroup className="grid gap-4 sm:grid-cols-2">
@@ -652,7 +652,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
               {activeTab === "progress" && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-extrabold text-foreground flex items-center gap-2">
+                    <h3 className="text-lg font-sans font-semibold tracking-tight text-foreground flex items-center gap-2">
                       <Clock className="h-4 w-4 text-primary" />
                       Timeline Milestone Progres
                     </h3>
@@ -731,7 +731,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
               {activeTab === "docs" && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-md font-extrabold text-foreground">Dokumen Serah Terima & Manual</h3>
+                    <h3 className="text-md font-sans font-semibold tracking-tight text-foreground">Dokumen Serah Terima & Manual</h3>
                     <button
                       onClick={() => {
                         setDocTitle("");
@@ -789,7 +789,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                 <div className="space-y-6">
                   {/* Header */}
                   <div className="flex items-center justify-between">
-                    <h3 className="text-md font-extrabold text-foreground">Daftar Paket Maintenance</h3>
+                    <h3 className="text-md font-sans font-semibold tracking-tight text-foreground">Daftar Paket Maintenance</h3>
                     <button
                       onClick={() => {
                         setEditingMaintItem(null);
@@ -813,7 +813,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
                               <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600">
                                 Paket Terdaftar
                               </span>
-                              <h3 className="text-lg font-extrabold text-foreground mt-1">
+                              <h3 className="text-lg font-sans font-semibold text-foreground mt-1">
                                 {m.packageName}
                               </h3>
                             </div>
@@ -943,7 +943,7 @@ export function AdminProjectDetailScreen({ projectId }: { readonly projectId: st
               {activeTab === "invoice" && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-md font-extrabold text-foreground">Daftar Tagihan Invoice</h3>
+                    <h3 className="text-md font-sans font-semibold tracking-tight text-foreground">Daftar Tagihan Invoice</h3>
                     <button
                       onClick={() => {
                         setInvNum("");
