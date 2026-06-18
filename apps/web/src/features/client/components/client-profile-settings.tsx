@@ -8,6 +8,7 @@ import { useAuthGuard } from "@/features/auth/hooks/use-auth";
 import { useUpdateClientProfile } from "../hooks/use-client";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 
 export function ClientProfileSettings() {
@@ -132,19 +133,13 @@ export function ClientProfileSettings() {
 
               <Field className="space-y-2">
                 <FieldLabel htmlFor="password">Password Baru</FieldLabel>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Password minimal 8 karakter"
-                  {...register("password")}
-                />
+                <PasswordInput id="password" placeholder="Password minimal 8 karakter" {...register("password")} />
               </Field>
 
               <Field className="space-y-2">
                 <FieldLabel htmlFor="confirmPassword">Konfirmasi Password Baru</FieldLabel>
-                <Input
+                <PasswordInput
                   id="confirmPassword"
-                  type="password"
                   placeholder="Ketik ulang password baru Anda"
                   {...register("confirmPassword")}
                 />

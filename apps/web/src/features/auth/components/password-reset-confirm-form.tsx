@@ -3,7 +3,7 @@
 import { KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Link } from "@/i18n/routing";
 import { usePasswordResetConfirmForm } from "../hooks/use-auth";
 
@@ -27,12 +27,12 @@ export function PasswordResetConfirmForm({ token }: PasswordResetConfirmFormProp
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="password">Password baru</FieldLabel>
-          <Input id="password" type="password" autoComplete="new-password" {...register("password")} />
+          <PasswordInput id="password" autoComplete="new-password" {...register("password")} />
           {errors.password ? <FieldError>{errors.password.message}</FieldError> : null}
         </Field>
         <Field>
           <FieldLabel htmlFor="confirmPassword">Konfirmasi password baru</FieldLabel>
-          <Input id="confirmPassword" type="password" autoComplete="new-password" {...register("confirmPassword")} />
+          <PasswordInput id="confirmPassword" autoComplete="new-password" {...register("confirmPassword")} />
           {errors.confirmPassword ? <FieldError>{errors.confirmPassword.message}</FieldError> : null}
         </Field>
       </FieldGroup>

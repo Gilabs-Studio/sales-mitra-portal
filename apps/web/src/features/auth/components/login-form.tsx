@@ -4,6 +4,7 @@ import { LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Link } from "@/i18n/routing";
 import { useLoginForm } from "../hooks/use-auth";
 
@@ -25,7 +26,7 @@ export function LoginForm() {
         </Field>
         <Field>
           <FieldLabel htmlFor="password">Password</FieldLabel>
-          <Input id="password" type="password" autoComplete="current-password" {...register("password")} />
+          <PasswordInput id="password" autoComplete="current-password" {...register("password")} />
           {errors.password ? <FieldError>{errors.password.message}</FieldError> : null}
         </Field>
       </FieldGroup>

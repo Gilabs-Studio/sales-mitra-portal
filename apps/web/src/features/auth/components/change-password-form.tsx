@@ -3,7 +3,7 @@
 import { KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useChangePasswordForm } from "../hooks/use-auth";
 
 export function ChangePasswordForm() {
@@ -18,17 +18,17 @@ export function ChangePasswordForm() {
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="oldPassword">Password lama</FieldLabel>
-          <Input id="oldPassword" type="password" autoComplete="current-password" {...register("oldPassword")} />
+          <PasswordInput id="oldPassword" autoComplete="current-password" {...register("oldPassword")} />
           {errors.oldPassword ? <FieldError>{errors.oldPassword.message}</FieldError> : null}
         </Field>
         <Field>
           <FieldLabel htmlFor="newPassword">Password baru</FieldLabel>
-          <Input id="newPassword" type="password" autoComplete="new-password" {...register("newPassword")} />
+          <PasswordInput id="newPassword" autoComplete="new-password" {...register("newPassword")} />
           {errors.newPassword ? <FieldError>{errors.newPassword.message}</FieldError> : null}
         </Field>
         <Field>
           <FieldLabel htmlFor="confirmPassword">Konfirmasi password baru</FieldLabel>
-          <Input id="confirmPassword" type="password" autoComplete="new-password" {...register("confirmPassword")} />
+          <PasswordInput id="confirmPassword" autoComplete="new-password" {...register("confirmPassword")} />
           {errors.confirmPassword ? <FieldError>{errors.confirmPassword.message}</FieldError> : null}
         </Field>
       </FieldGroup>

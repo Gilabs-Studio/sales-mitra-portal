@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ShieldPlus } from "lucide-react";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useCreateAdmin } from "../hooks/use-admin";
 
 const initialForm = {
@@ -65,13 +66,11 @@ export function AddAdminPanel() {
         </label>
         <label className="grid gap-1.5 text-sm font-semibold text-foreground">
           Password
-          <input
+          <PasswordInput
             required
             minLength={8}
-            type="password"
             value={form.password}
             onChange={(event) => updateField("password", event.target.value)}
-            className="min-h-11 rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-primary"
           />
         </label>
         <div className="md:col-span-2 flex flex-wrap items-center gap-3">

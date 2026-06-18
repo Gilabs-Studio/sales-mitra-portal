@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useLoginForm } from "@/features/auth/hooks/use-auth";
 
 export function ClientLoginScreen() {
@@ -50,13 +51,7 @@ export function ClientLoginScreen() {
             </Field>
             <Field className="space-y-2">
               <FieldLabel htmlFor="password">Password</FieldLabel>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="••••••••"
-                {...register("password")}
-              />
+              <PasswordInput id="password" autoComplete="current-password" placeholder="••••••••" {...register("password")} />
               {errors.password ? <FieldError>{errors.password.message}</FieldError> : null}
             </Field>
           </FieldGroup>
