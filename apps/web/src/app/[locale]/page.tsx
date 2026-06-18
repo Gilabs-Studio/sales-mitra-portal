@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { ArrowRight, Download, Smartphone, TrendingUp, Zap, Shield } from "lucide-react";
+import { ArrowRight, Download, MessageCircle, Smartphone, TrendingUp, Zap, Shield } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { getPartnerResources } from "@/features/resources/resources";
 import {
@@ -20,6 +20,7 @@ export default async function HomePage({ params }: PageProps) {
   const { locale } = await params;
   const isEn = locale === "en";
   const mobileDownloadUrl = process.env.NEXT_PUBLIC_MOBILE_APP_DOWNLOAD_URL;
+  const whatsappUrl = "https://wa.me/6289526770703";
   const resources = getPartnerResources(locale);
 
   const t = {
@@ -28,6 +29,7 @@ export default async function HomePage({ params }: PageProps) {
       about:    isEn ? "How it works"  : "Cara Kerja",
       scheme:   isEn ? "Commission"    : "Skema Komisi",
       cases:    isEn ? "Case Studies"  : "Studi Kasus",
+      contact:  isEn ? "Contact"       : "Kontak",
       login:    isEn ? "Login"         : "Masuk",
       register: isEn ? "Register Now"  : "Daftar Sekarang",
     },
@@ -115,6 +117,15 @@ export default async function HomePage({ params }: PageProps) {
     dirIntro: isEn
       ? "Everything you need to start referring and earning — right here"
       : "Semua yang kamu butuhkan untuk mulai referral dan dapat komisi — ada di sini",
+
+    /* ── Contact ─────────────────────────────────────────────── */
+    contactEyebrow: isEn ? "NEED HELP?" : "BUTUH BANTUAN?",
+    contactTitle: isEn ? "Talk directly with GiLabs team" : "Ngobrol langsung dengan tim GiLabs",
+    contactBody: isEn
+      ? "Have questions before registering, want to discuss a lead, or need help choosing the right opportunity? Message us on WhatsApp."
+      : "Punya pertanyaan sebelum daftar, mau diskusi lead, atau butuh bantuan memilih peluang? Hubungi kami lewat WhatsApp.",
+    contactBtn: isEn ? "Chat on WhatsApp" : "Chat via WhatsApp",
+    contactPhone: "+62 895-2677-0703",
   };
 
   /* ── Icons per value prop ───── */
@@ -147,6 +158,7 @@ export default async function HomePage({ params }: PageProps) {
               { label: t.nav.about,  href: "#cara-kerja" },
               { label: t.nav.scheme, href: "#skema" },
               { label: t.nav.cases,  href: "#sumber" },
+              { label: t.nav.contact, href: "#kontak" },
             ].map((item) => (
               <a
                 key={item.href}
@@ -427,6 +439,36 @@ export default async function HomePage({ params }: PageProps) {
                 </span>
               </Link>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Contact ───────────────────────────────────────────── */}
+      <section id="kontak" className="mx-auto max-w-7xl px-6 pb-24">
+        <div className="rounded-lg border border-border/40 bg-card p-8 md:p-12">
+          <div className="grid grid-cols-1 items-center gap-8 md:grid-cols-[1fr_auto]">
+            <div>
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-3">
+                {t.contactEyebrow}
+              </span>
+              <h2 className="text-2xl md:text-3xl font-sans font-medium text-foreground tracking-tight">
+                {t.contactTitle}
+              </h2>
+              <p className="mt-4 max-w-2xl text-sm md:text-base leading-relaxed text-muted-foreground">
+                {t.contactBody}
+              </p>
+            </div>
+
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3.5 text-sm font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/10 active:translate-y-0"
+            >
+              <MessageCircle className="h-4 w-4" aria-hidden="true" />
+              <span>{t.contactBtn}</span>
+              <span className="font-mono text-[11px] opacity-80">{t.contactPhone}</span>
+            </a>
           </div>
         </div>
       </section>
