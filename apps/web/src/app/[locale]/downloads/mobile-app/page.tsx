@@ -4,10 +4,27 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { ChevronLeft, Download, ShieldCheck, Smartphone, HelpCircle } from "lucide-react";
 import { useRouter } from "@/i18n/routing";
+import tutorial1 from "../../../../../public/tutorial/1.webp";
+import tutorial2 from "../../../../../public/tutorial/2.webp";
+import tutorial3 from "../../../../../public/tutorial/3.webp";
+import tutorial4 from "../../../../../public/tutorial/4.webp";
+import tutorial5 from "../../../../../public/tutorial/5.webp";
+import tutorial6 from "../../../../../public/tutorial/6.webp";
+import tutorial7 from "../../../../../public/tutorial/7.webp";
 
 type MobileAppDownloadPageProps = {
   params: Promise<{ locale: string }>;
 };
+
+const tutorialImages = [
+  tutorial1,
+  tutorial2,
+  tutorial3,
+  tutorial4,
+  tutorial5,
+  tutorial6,
+  tutorial7,
+] as const;
 
 export default function MobileAppDownloadPage({
   params,
@@ -61,49 +78,49 @@ export default function MobileAppDownloadPage({
       desc: isEn 
         ? "Tap the download button to start saving the installation file (.apk) to your device."
         : "Tekan tombol download untuk menyimpan file installer (.apk) ke perangkat Android Anda.",
-      image: "/tutorial/1.webp",
+      image: tutorialImages[0],
     },
     {
       title: isEn ? "Open the Installer" : "Buka File APK",
       desc: isEn 
         ? "Tap the download notification or search for the file in your downloads folder."
         : "Buka file APK yang sudah selesai terunduh dari bar notifikasi atau file manager.",
-      image: "/tutorial/2.webp",
+      image: tutorialImages[1],
     },
     {
       title: isEn ? "Confirm Pemasangan" : "Konfirmasi Pemasangan",
       desc: isEn 
         ? "Tap 'Install' when the setup prompt asks to confirm the application installer."
         : "Saat muncul pertanyaan untuk menginstall aplikasi, lanjutkan dengan memilih 'Install'.",
-      image: "/tutorial/3.webp",
+      image: tutorialImages[2],
     },
     {
       title: isEn ? "Play Protect Security Suggestion" : "Saran Keamanan Play Protect",
       desc: isEn 
         ? "If Google asks to scan the package, tap 'Scan app' to verify local security."
         : "Jika muncul anjuran pemindaian dari Google Play Protect, pilih 'Pindai aplikasi'.",
-      image: "/tutorial/4.webp",
+      image: tutorialImages[3],
     },
     {
       title: isEn ? "Wait for the Scan" : "Proses Pemindaian",
       desc: isEn 
         ? "Wait a moment while the system runs security checks on the package."
         : "Tunggu beberapa saat selagi sistem Android menyelesaikan proses verifikasi keamanan.",
-      image: "/tutorial/5.webp",
+      image: tutorialImages[4],
     },
     {
       title: isEn ? "Proceed with Installation" : "Lanjutkan Pemasangan",
       desc: isEn 
         ? "Once verification shows safe, tap 'Install' again if prompted to finish."
         : "Setelah status pemindaian aman, pilih kembali 'Install' untuk melanjutkan pemasangan.",
-      image: "/tutorial/6.webp",
+      image: tutorialImages[5],
     },
     {
       title: isEn ? "App Installed Successfully" : "Aplikasi Berhasil Terpasang",
       desc: isEn 
         ? "Tap 'Open' to launch GiLabs Mobile and sign in using your partner credentials."
         : "Pilih 'Buka' untuk mulai masuk ke aplikasi GiLabs Mobile menggunakan akun mitra Anda.",
-      image: "/tutorial/7.webp",
+      image: tutorialImages[6],
     },
   ];
 
@@ -112,7 +129,7 @@ export default function MobileAppDownloadPage({
       
       {/* Preload all tutorial screenshots in the head for instant transitions */}
       {steps.map((step) => (
-        <link key={step.image} rel="preload" as="image" href={step.image} />
+        <link key={step.image.src} rel="preload" as="image" href={step.image.src} />
       ))}
 
       <div className="w-full max-w-5xl mx-auto flex flex-col gap-6">
@@ -225,7 +242,11 @@ export default function MobileAppDownloadPage({
                               width={480}
                               height={1066}
                               className="h-auto w-full object-contain"
-                              priority
+                              placeholder="blur"
+                              sizes="240px"
+                              unoptimized
+                              priority={idx === 0}
+                              loading={idx === 0 ? undefined : "eager"}
                             />
                           </div>
                         </div>
@@ -252,13 +273,23 @@ export default function MobileAppDownloadPage({
                 
                 {/* Screen Content - Instant transitions with priority preloaded images */}
                 <div className="relative flex-1 bg-black flex flex-col">
-                  <Image
-                    src={steps[activeStep].image}
-                    alt={`Screenshot Step ${activeStep + 1}`}
-                    fill
-                    className="object-cover object-top"
-                    priority
-                  />
+                  {steps.map((step, idx) => (
+                    <Image
+                      key={step.image.src}
+                      src={step.image}
+                      alt={activeStep === idx ? `Screenshot Step ${idx + 1}` : ""}
+                      aria-hidden={activeStep !== idx}
+                      fill
+                      sizes="252px"
+                      className={`pointer-events-none object-cover object-top transition-opacity duration-150 ease-out ${
+                        activeStep === idx ? "opacity-100" : "opacity-0"
+                      }`}
+                      placeholder="blur"
+                      unoptimized
+                      priority={idx === 0}
+                      loading={idx === 0 ? undefined : "eager"}
+                    />
+                  ))}
                 </div>
 
               </div>
