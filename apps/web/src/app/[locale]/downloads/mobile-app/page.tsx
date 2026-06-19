@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { ChevronLeft, Download, ShieldCheck, Smartphone, HelpCircle } from "lucide-react";
-import { Link } from "@/i18n/routing";
+import { useRouter } from "@/i18n/routing";
 
 type MobileAppDownloadPageProps = {
   params: Promise<{ locale: string }>;
@@ -15,9 +15,27 @@ export default function MobileAppDownloadPage({
   const { locale } = React.use(params);
   const isEn = locale === "en";
   const sourceUrl = process.env.NEXT_PUBLIC_MOBILE_APP_DOWNLOAD_URL;
-  const backHref = `/${locale}`;
+  const router = useRouter();
 
   const [activeStep, setActiveStep] = useState(0);
+
+  const handleBack = React.useCallback(() => {
+    if (typeof window === "undefined") {
+      router.replace("/");
+      return;
+    }
+
+    const hasHistory = window.history.length > 1;
+    const referrer = document.referrer;
+    const sameOriginReferrer = referrer.startsWith(window.location.origin);
+
+    if (hasHistory && sameOriginReferrer) {
+      window.history.back();
+      return;
+    }
+
+    router.replace("/");
+  }, [router]);
 
   const t = {
     back: isEn ? "Back to portal" : "Kembali ke portal",
@@ -101,13 +119,14 @@ export default function MobileAppDownloadPage({
         
         {/* Navigation Back */}
         <div>
-          <Link
-            href={backHref}
+          <button
+            type="button"
+            onClick={handleBack}
             className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
             {t.back}
-          </Link>
+          </button>
         </div>
 
         {/* Main Grid split */}
