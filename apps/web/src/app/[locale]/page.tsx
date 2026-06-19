@@ -210,14 +210,14 @@ export default async function HomePage({ params }: PageProps) {
             {t.heroSecondary}
           </Link>
           {mobileDownloadUrl ? (
-            <a
+            <Link
               href={mobileDownloadHref}
               className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
             >
               <Smartphone className="h-4 w-4" aria-hidden="true" />
-              {isEn ? "Download mobile app" : "Download aplikasi mobile"}
+              {isEn ? "Download mobile app" : "Download aplikasi"}
               <Download className="h-4 w-4" aria-hidden="true" />
-            </a>
+            </Link>
           ) : null}
         </div>
       </section>

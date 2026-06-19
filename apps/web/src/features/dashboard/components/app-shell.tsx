@@ -71,8 +71,11 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
   }, [adminScope, leadEmailPreference, user.leadEmailNotificationsEnabled]);
 
   React.useEffect(() => {
-    setMobileMenuOpen(false);
-    setProfileOpen(false);
+    const handle = requestAnimationFrame(() => {
+      setMobileMenuOpen(false);
+      setProfileOpen(false);
+    });
+    return () => cancelAnimationFrame(handle);
   }, [pathname]);
 
   React.useEffect(() => {
@@ -104,14 +107,14 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
 
           <div className="hidden items-center gap-6 lg:flex">
             {mobileDownloadUrl ? (
-              <a
+              <Link
                 href={mobileDownloadHref}
                 className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground transition-all duration-200 hover:bg-secondary"
               >
                 <Smartphone className="h-3.5 w-3.5" aria-hidden="true" />
                 Download App
                 <Download className="h-3.5 w-3.5" aria-hidden="true" />
-              </a>
+              </Link>
             ) : null}
             <nav className="flex items-center gap-5">
               {items.map((item) => {
@@ -234,13 +237,13 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
 
           <div className="flex items-center gap-2 lg:hidden">
             {mobileDownloadUrl ? (
-              <a
+              <Link
                 href={mobileDownloadHref}
-                aria-label="Download aplikasi mobile"
+                aria-label="Download aplikasi"
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors hover:bg-secondary"
               >
                 <Download className="h-4 w-4" aria-hidden="true" />
-              </a>
+              </Link>
             ) : null}
             <button
               type="button"
@@ -302,7 +305,7 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
               </nav>
 
               {mobileDownloadUrl ? (
-                <a
+                <Link
                   href={mobileDownloadHref}
                   className="inline-flex items-center justify-between rounded-2xl border border-border bg-secondary px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-card"
                 >
@@ -311,7 +314,7 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
                     Download aplikasi
                   </span>
                   <Download className="h-4 w-4" aria-hidden="true" />
-                </a>
+                </Link>
               ) : null}
 
               <div className="grid gap-2">
