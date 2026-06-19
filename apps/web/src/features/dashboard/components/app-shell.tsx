@@ -55,6 +55,7 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
     : partnerNav;
   const unreadQuery = useUnreadCount(adminScope ? "admin" : "partner", user.role !== "client");
   const mobileDownloadUrl = process.env.NEXT_PUBLIC_MOBILE_APP_DOWNLOAD_URL;
+  const mobileDownloadHref = "/downloads/mobile-app";
 
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [profileOpen, setProfileOpen] = React.useState(false);
@@ -104,9 +105,7 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
           <div className="hidden items-center gap-6 lg:flex">
             {mobileDownloadUrl ? (
               <a
-                href={mobileDownloadUrl}
-                target="_blank"
-                rel="noreferrer"
+                href={mobileDownloadHref}
                 className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground transition-all duration-200 hover:bg-secondary"
               >
                 <Smartphone className="h-3.5 w-3.5" aria-hidden="true" />
@@ -236,9 +235,7 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
           <div className="flex items-center gap-2 lg:hidden">
             {mobileDownloadUrl ? (
               <a
-                href={mobileDownloadUrl}
-                target="_blank"
-                rel="noreferrer"
+                href={mobileDownloadHref}
                 aria-label="Download aplikasi mobile"
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors hover:bg-secondary"
               >
@@ -306,9 +303,7 @@ export function AppShell({ user, children, noPadding }: Readonly<AppShellProps>)
 
               {mobileDownloadUrl ? (
                 <a
-                  href={mobileDownloadUrl}
-                  target="_blank"
-                  rel="noreferrer"
+                  href={mobileDownloadHref}
                   className="inline-flex items-center justify-between rounded-2xl border border-border bg-secondary px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-card"
                 >
                   <span className="inline-flex items-center gap-2">

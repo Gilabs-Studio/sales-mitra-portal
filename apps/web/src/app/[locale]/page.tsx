@@ -20,6 +20,7 @@ export default async function HomePage({ params }: PageProps) {
   const { locale } = await params;
   const isEn = locale === "en";
   const mobileDownloadUrl = process.env.NEXT_PUBLIC_MOBILE_APP_DOWNLOAD_URL;
+  const mobileDownloadHref = "/downloads/mobile-app";
   const whatsappUrl = "https://wa.me/6289526770703";
   const resources = getPartnerResources(locale);
 
@@ -210,9 +211,7 @@ export default async function HomePage({ params }: PageProps) {
           </Link>
           {mobileDownloadUrl ? (
             <a
-              href={mobileDownloadUrl}
-              target="_blank"
-              rel="noreferrer"
+              href={mobileDownloadHref}
               className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
             >
               <Smartphone className="h-4 w-4" aria-hidden="true" />
